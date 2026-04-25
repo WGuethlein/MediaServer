@@ -1,0 +1,30 @@
+services:
+  crowdsec:
+    container_name: crowdsec
+    image: crowdsecurity/crowdsec:v1.7.7
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${CROWDSEC_IP}
+      t3_proxy:               # Traefik plugin reaches LAPI via this network
+    ports:
+      - "${CROWDSEC_API_PORT}:8080"   # LAN-only; not WAN-exposed
+    environment:
+      TZ: ${TZ}
+      GID: "${PGID}"
+      CUSTOM_HOSTNAME: ${CUSTOM_HOSTNAME}
+      COLLECTIONS: >-
+        crowdsecurity/traefik
+        crowdsecurity/http-cve
+        crowdsecurity/whitelist-good-actors
+        crowdsecurity/iptables
+        crowdsecurity/linux
+        crowdsecurity/nginx
+        crowdsecurity/sshd
+    volumes:
+      - ${DOCKERDIR}/logs:/logs:ro          # CrowdSec reads Traefik logs from here
+      - /var/log:/var/log:ro                 # System logs (sshd, ufw, etc.)
+      - ${DOCKERDIR}/appdata/crowdsec/data:/var/lib/crowdsec/data
+      - ${DOCKERDIR}/appdata/crowdsec/config:/etc/crowdsec
