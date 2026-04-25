@@ -1,0 +1,42 @@
+services:
+  socket-proxy:
+    container_name: socket-proxy
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    privileged: true   # Required to read /var/run/docker.sock; the network isolation is what keeps it safe
+    networks:
+      socket_proxy:
+        ipv4_address: ${SP_IP}
+    # No published ports — only reachable inside socket_proxy network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL}
+      # Granted by default
+      EVENTS: 1
+      PING: 1
+      VERSION: 1
+      # Revoked by default — re-enable per consumer
+      AUTH: 0
+      SECRETS: 0
+      POST: 1            # Diun needs to issue PUT/POST against /containers (image inspect, etc.)
+      # Not always needed — minimal grant
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      CONTAINERS: 1      # Traefik (label discovery), Diun, Dozzle
+      DISTRIBUTION: 0
+      EXEC: 0
+      IMAGES: 1          # Diun (image registry checks)
+      INFO: 1            # Dozzle
+      NETWORKS: 1        # Traefik (network discovery)
+      NODES: 0
+      PLUGINS: 0
+      SERVICES: 1        # Traefik (in case we ever swarm)
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0           # Was 1 in V1 for Portainer; we don't run Portainer
+      VOLUMES: 0         # Was 1 in V1 for Portainer
