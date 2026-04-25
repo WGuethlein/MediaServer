@@ -7,10 +7,11 @@ services:
       - no-new-privileges:true
     depends_on:
       - socket-proxy
+      - crowdsec
     networks:
       t3_proxy:
         ipv4_address: ${TRAEFIK_IP}
-      socket_proxy:        # to talk to socket-proxy
+      socket_proxy:           # to talk to socket-proxy
     ports:
       - target: 80
         published: 80
@@ -29,7 +30,8 @@ services:
       CF_DNS_API_TOKEN_FILE: /run/secrets/cf_dns_api_token
       HTPASSWD_FILE: /run/secrets/basic_auth_credentials
       DOMAINNAME_1: ${DOMAINNAME_1}
-      # CROWDSEC_BOUNCER_TRAEFIK_API_KEY is set in phase 6 once CrowdSec is running
+      # Required by middlewares-crowdsec.yml's Go template
+      CROWDSEC_BOUNCER_TRAEFIK_API_KEY: ${CROWDSEC_BOUNCER_TRAEFIK_API_KEY}
     secrets:
       - cf_dns_api_token
       - basic_auth_credentials
@@ -50,15 +52,16 @@ services:
       - --entrypoints.websecure.http.tls.domains[0].main=${DOMAINNAME_1}
       - --entrypoints.websecure.http.tls.domains[0].sans=*.${DOMAINNAME_1}
 
-      # Trust forwarded headers from these IPs only (LAN — Cloudflare not used since gray cloud)
+      # Trust forwarded headers from LAN only (gray cloud — Cloudflare not in path)
       - --entrypoints.websecure.forwardedHeaders.trustedIPs=${LOCAL_IPS}
 
       # ─── API & dashboard ──────────────────────────────────────────
       - --api=true
       - --api.dashboard=true
-      - --api.insecure=false   # explicit; dashboard reached via Traefik routing only
+      - --api.insecure=false   # dashboard only via Traefik routing
 
-      # ─── Logging ──────────────────────────────────────────────────
+      # ─── Logging — to stdout AND file ─────────────────────────────
+      # stdout for `docker compose logs`, file for crowdsec to ingest
       - --log=true
       - --log.filePath=/logs/traefik.log
       - --log.level=${LOG_LEVEL}
@@ -76,22 +79,23 @@ services:
       - --providers.file.watch=true
 
       # ─── ACME / Let's Encrypt (DNS-01 via Cloudflare) ─────────────
-      # Uncomment the staging line FIRST when testing — LE rate limits in production are real
+      # Comment this staging line out for production after first successful issuance
       - --certificatesResolvers.dns-cloudflare.acme.caServer=https://acme-staging-v02.api.letsencrypt.org/directory
       - --certificatesResolvers.dns-cloudflare.acme.email=${CLOUDFLARE_EMAIL}
       - --certificatesResolvers.dns-cloudflare.acme.storage=/acme.json
       - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.provider=cloudflare
       - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53
+      # Use propagation.delayBeforeChecks (with units), NOT the deprecated delayBeforeCheck
       - --certificatesResolvers.dns-cloudflare.acme.dnsChallenge.propagation.delayBeforeChecks=60s
 
       # ─── Plugins (CrowdSec bouncer) ───────────────────────────────
-     # - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-     # - --experimental.plugins.bouncer.version=v1.4.4
+      - --experimental.plugins.bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      - --experimental.plugins.bouncer.version=v1.4.4
     labels:
       - traefik.enable=true
       # Routes traefik.geet.dev → Traefik's own API service
       - traefik.http.routers.traefik-rtr.entrypoints=websecure
       - traefik.http.routers.traefik-rtr.rule=Host(`${TRAEFIK_SUBDOMAIN}.${DOMAINNAME_1}`)
       - traefik.http.routers.traefik-rtr.service=api@internal
-      # Apply chain-authelia (will work once Authelia is up in stage D; until then dashboard is broken — by design)
+      # Apply chain-authelia (Authelia must be running in stage E for this route to actually serve)
       - traefik.http.routers.traefik-rtr.middlewares=chain-authelia@file
