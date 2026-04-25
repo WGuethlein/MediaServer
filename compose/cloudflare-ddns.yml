@@ -1,0 +1,29 @@
+services:
+  cloudflare-ddns:
+    container_name: cloudflare-ddns
+    image: favonia/cloudflare-ddns:1.15.1
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    cap_drop:
+      - all
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    networks:
+      default:
+        ipv4_address: ${CF_DDNS_IP}
+    user: ${PUID}:${PGID}
+    environment:
+      TZ: ${TZ}
+      CLOUDFLARE_API_TOKEN_FILE: /run/secrets/cf_ddns_api_token
+      DOMAINS: ${CF_DDNS_DOMAINS}
+      PROXIED: ${CF_DDNS_PROXIED}
+      IP4_PROVIDER: cloudflare.trace
+      IP6_PROVIDER: none
+      UPDATE_CRON: "@every 5m"
+      CACHE_EXPIRATION: 6h
+    secrets:
+      - cf_ddns_api_token

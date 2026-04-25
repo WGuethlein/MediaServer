@@ -74,38 +74,38 @@ include:
   # --- CORE INFRA ---
   - compose/socket-proxy.yml
   - compose/traefik.yml
-  - compose/authelia.yml
+#  - compose/authelia.yml
   - compose/crowdsec.yml
   - compose/cloudflare-ddns.yml
 
   # --- VPN / DOWNLOADERS ---
-  - compose/gluetun.yml
-  - compose/qbittorrent.yml
-  - compose/sabnzbd.yml
+#  - compose/gluetun.yml
+#  - compose/qbittorrent.yml
+#  - compose/sabnzbd.yml
 
   # --- *ARR SUITE ---
-  - compose/prowlarr.yml
-  - compose/sonarr.yml
-  - compose/radarr.yml
-  - compose/lidarr.yml
-  - compose/bazarr.yml
-  - compose/flaresolverr.yml
-  - compose/unpackerr.yml
+#  - compose/prowlarr.yml
+#  - compose/sonarr.yml
+#  - compose/radarr.yml
+#  - compose/lidarr.yml
+#  - compose/bazarr.yml
+#  - compose/flaresolverr.yml
+#  - compose/unpackerr.yml
 
   # --- MEDIA SERVER ---
-  - compose/plex.yml
-  - compose/tdarr.yml
+#  - compose/plex.yml
+#  - compose/tdarr.yml
 
   # --- REQUESTS & DASHBOARDS ---
-  - compose/overseerr.yml
-  - compose/audiobookrequest.yml
-  - compose/listenarr.yml
-  - compose/homepage.yml
+#  - compose/overseerr.yml
+#  - compose/audiobookrequest.yml
+#  - compose/listenarr.yml
+#  - compose/homepage.yml
 
   # --- OPS / OBSERVABILITY ---
-  - compose/diun.yml
-  - compose/dozzle.yml
+#  - compose/diun.yml
+#  - compose/dozzle.yml
 
   # --- OTHER ---
-  - compose/mealie.yml
-  - compose/minecraft.yml
+#  - compose/mealie.yml
+#  - compose/minecraft.yml
