@@ -1,0 +1,24 @@
+# Secrets — never commit
+secrets/
+.env
+
+# Runtime data — stateful, large, host-specific
+appdata/
+logs/
+
+# Traefik runtime state
+traefik/acme/acme.json
+traefik/acme/
+
+# Editor / OS junk
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Backup files from editors
+*.bak
+*.orig

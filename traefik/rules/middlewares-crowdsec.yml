@@ -1,0 +1,10 @@
+http:
+  middlewares:
+    middlewares-crowdsec:
+      plugin:
+        bouncer:
+          enabled: true
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiKey: "{{ env "CROWDSEC_BOUNCER_TRAEFIK_API_KEY" }}"
+          crowdsecMode: stream
+          crowdsecLapiScheme: http

@@ -1,0 +1,111 @@
+########################################
+# udms — Ultimate Docker Media Server v2
+# Entry point: includes service files from ./compose/
+########################################
+
+########################################
+# NETWORKS
+########################################
+networks:
+  default:
+    name: udms_default
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/24
+          gateway: 172.18.0.1
+
+  t3_proxy:
+    name: t3_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.90.0/24
+          gateway: 192.168.90.1
+
+  socket_proxy:
+    name: socket_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.91.0/24
+          gateway: 192.168.91.1
+    internal: true   # No external connectivity — socket access only
+
+  downloads:
+    name: downloads
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/24
+          gateway: 172.19.0.1
+
+########################################
+# SECRETS
+########################################
+secrets:
+  cf_dns_api_token:
+    file: ${DOCKERDIR}/secrets/cf_dns_api_token
+  cf_ddns_api_token:
+    file: ${DOCKERDIR}/secrets/cf_ddns_api_token
+  basic_auth_credentials:
+    file: ${DOCKERDIR}/secrets/basic_auth_credentials
+  plex_claim:
+    file: ${DOCKERDIR}/secrets/plex_claim
+  surfshark_wg_private_key:
+    file: ${DOCKERDIR}/secrets/surfshark_wg_private_key
+  authelia_jwt_secret:
+    file: ${DOCKERDIR}/secrets/authelia_jwt_secret
+  authelia_session_secret:
+    file: ${DOCKERDIR}/secrets/authelia_session_secret
+  authelia_storage_encryption_key:
+    file: ${DOCKERDIR}/secrets/authelia_storage_encryption_key
+  authelia_google_client_id:
+    file: ${DOCKERDIR}/secrets/authelia_google_client_id
+  authelia_google_client_secret:
+    file: ${DOCKERDIR}/secrets/authelia_google_client_secret
+  diun_discord_webhook:
+    file: ${DOCKERDIR}/secrets/diun_discord_webhook
+
+########################################
+# SERVICES — included from compose/*.yml
+########################################
+include:
+  # --- CORE INFRA ---
+  - compose/socket-proxy.yml
+  - compose/traefik.yml
+  - compose/authelia.yml
+  - compose/crowdsec.yml
+  - compose/cloudflare-ddns.yml
+
+  # --- VPN / DOWNLOADERS ---
+  - compose/gluetun.yml
+  - compose/qbittorrent.yml
+  - compose/sabnzbd.yml
+
+  # --- *ARR SUITE ---
+  - compose/prowlarr.yml
+  - compose/sonarr.yml
+  - compose/radarr.yml
+  - compose/lidarr.yml
+  - compose/bazarr.yml
+  - compose/flaresolverr.yml
+  - compose/unpackerr.yml
+
+  # --- MEDIA SERVER ---
+  - compose/plex.yml
+  - compose/tdarr.yml
+
+  # --- REQUESTS & DASHBOARDS ---
+  - compose/overseerr.yml
+  - compose/audiobookrequest.yml
+  - compose/listenarr.yml
+  - compose/homepage.yml
+
+  # --- OPS / OBSERVABILITY ---
+  - compose/diun.yml
+  - compose/dozzle.yml
+
+  # --- OTHER ---
+  - compose/mealie.yml
+  - compose/minecraft.yml

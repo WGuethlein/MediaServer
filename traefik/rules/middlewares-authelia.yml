@@ -1,0 +1,22 @@
+http:
+  middlewares:
+    middlewares-authelia:
+      forwardAuth:
+        address: "http://authelia:9091/api/verify?rd=https%3A%2F%2Fauth.geet.dev%2F"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - Remote-User
+          - Remote-Groups
+          - Remote-Name
+          - Remote-Email
+
+    middlewares-authelia-basic:
+      # For services that can't handle redirects (CLI tools, mobile apps via API)
+      forwardAuth:
+        address: "http://authelia:9091/api/verify?auth=basic"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - Remote-User
+          - Remote-Groups
+          - Remote-Name
+          - Remote-Email
