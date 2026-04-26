@@ -86,8 +86,8 @@ include:
 
   # --- VPN / DOWNLOADERS ---
   - compose/gluetun.yml
-#  - compose/qbittorrent.yml
-#  - compose/sabnzbd.yml
+  - compose/qbittorrent.yml
+  - compose/sabnzbd.yml
 
   # --- *ARR SUITE ---
 #  - compose/prowlarr.yml

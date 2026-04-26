@@ -1,0 +1,28 @@
+services:
+  sabnzbd:
+    container_name: sabnzbd
+    image: lscr.io/linuxserver/sabnzbd:4.4.1
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${SABNZBD_IP}
+      t3_proxy:
+    # No host port — reached via Traefik only
+    volumes:
+      - ${DOCKERDIR}/appdata/sabnzbd:/config
+      - ${DATADIR_DOWNLOADS}:/data/downloads
+      # No /data/media — same reason as qBit
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      UMASK: ${SAB_UMASK_SET}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sabnzbd-rtr.entrypoints=websecure
+      - traefik.http.routers.sabnzbd-rtr.rule=Host(`${SABNZBD_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.sabnzbd-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.sabnzbd-rtr.service=sabnzbd-svc
+      - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080
