@@ -1,0 +1,46 @@
+services:
+  gluetun:
+    container_name: gluetun
+    image: qmcgaw/gluetun:v3.40.0
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      downloads:
+        ipv4_address: ${GLUETUN_IP}
+    ports:
+      # qBit WebUI — published from Gluetun's namespace because qBit shares it
+      - "${GLUETUN_PORT}:8080"
+    volumes:
+      - ${DOCKERDIR}/appdata/gluetun:/gluetun
+    environment:
+      TZ: ${TZ}
+      # Provider + transport
+      VPN_SERVICE_PROVIDER: ${VPN_PROVIDER}
+      VPN_TYPE: ${VPN_TYPE}
+      WIREGUARD_PRIVATE_KEY_SECRETFILE: /run/secrets/surfshark_wg_private_key
+      WIREGUARD_ADDRESSES: ${WIREGUARD_ADDRESSES}
+      # Killswitch — block all non-VPN egress (default behavior, but explicit)
+      FIREWALL: "on"
+      FIREWALL_OUTBOUND_SUBNETS: 172.19.0.0/24,192.168.1.0/24
+      # DNS — use Gluetun's built-in DoT, not the VPN provider's DNS
+      DOT: "on"
+      DOT_PROVIDERS: cloudflare
+      DOT_PRIVATE_ADDRESS: 127.0.0.1/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      # Disable control server (no PF, no scripting needs)
+      HTTP_CONTROL_SERVER_ADDRESS: ""
+      # Healthcheck — Gluetun pings via its own loop; tune for stability
+      HEALTH_VPN_DURATION_INITIAL: 30s
+      HEALTH_SUCCESS_WAIT_DURATION: 10s
+      LOG_LEVEL: info
+    secrets:
+      - surfshark_wg_private_key
+    healthcheck:
+      # Gluetun's built-in healthcheck endpoint — fails if VPN tunnel down
+      test: ["CMD", "wget", "-q", "-O-", "https://ipinfo.io/ip"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

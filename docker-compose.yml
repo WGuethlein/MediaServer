@@ -85,7 +85,7 @@ include:
   - compose/cloudflare-ddns.yml
 
   # --- VPN / DOWNLOADERS ---
-#  - compose/gluetun.yml
+  - compose/gluetun.yml
 #  - compose/qbittorrent.yml
 #  - compose/sabnzbd.yml
 
