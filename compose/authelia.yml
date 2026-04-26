@@ -1,0 +1,38 @@
+services:
+  authelia:
+    container_name: authelia
+    image: authelia/authelia:4.39
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - traefik
+    networks:
+      t3_proxy:
+        ipv4_address: ${AUTHELIA_IP}
+    volumes:
+      - ${DOCKERDIR}/appdata/authelia:/config
+    environment:
+      TZ: ${TZ}
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/authelia_jwt_secret
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session_secret
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage_encryption_key
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE: /run/secrets/authelia_oidc_hmac_secret
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_ISSUER_PRIVATE_KEY_FILE: /run/secrets/authelia_oidc_issuer_private_key
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_KEY_FILE: /run/secrets/authelia_oidc_issuer_private_key
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_KEY_ID: 'main-rsa'
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_ALGORITHM: 'RS256'
+      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_USE: 'sig'
+    secrets:
+      - authelia_jwt_secret
+      - authelia_session_secret
+      - authelia_storage_encryption_key
+      - authelia_oidc_hmac_secret
+      - authelia_oidc_issuer_private_key
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.authelia-rtr.entrypoints=websecure
+      - traefik.http.routers.authelia-rtr.rule=Host(`${AUTHELIA_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.authelia-rtr.middlewares=chain-no-auth@file
+      - traefik.http.routers.authelia-rtr.service=authelia-svc
+      - traefik.http.services.authelia-svc.loadbalancer.server.port=9091

@@ -64,8 +64,14 @@ secrets:
     file: ${DOCKERDIR}/secrets/authelia_google_client_id
   authelia_google_client_secret:
     file: ${DOCKERDIR}/secrets/authelia_google_client_secret
+  authelia_oidc_hmac_secret:
+    file: ${DOCKERDIR}/secrets/authelia_oidc_hmac_secret
+  authelia_oidc_issuer_private_key:
+    file: ${DOCKERDIR}/secrets/authelia_oidc_issuer_private_key
   diun_discord_webhook:
     file: ${DOCKERDIR}/secrets/diun_discord_webhook
+  mealie_oidc_client_secret:
+    file: ${DOCKERDIR}/secrets/mealie_oidc_client_secret
 
 ########################################
 # SERVICES — included from compose/*.yml
@@ -74,7 +80,7 @@ include:
   # --- CORE INFRA ---
   - compose/socket-proxy.yml
   - compose/traefik.yml
-#  - compose/authelia.yml
+  - compose/authelia.yml
   - compose/crowdsec.yml
   - compose/cloudflare-ddns.yml
 
