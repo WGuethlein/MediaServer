@@ -8,6 +8,7 @@ services:
     networks:
       default:
         ipv4_address: ${SONARR_IP}
+      downloads:
       t3_proxy:
     volumes:
       - ${DOCKERDIR}/appdata/sonarr:/config

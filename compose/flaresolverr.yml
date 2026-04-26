@@ -1,0 +1,17 @@
+services:
+  flaresolverr:
+    container_name: flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:v3.4.6
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${FLARESOLVERR_IP}
+    # No published port — Prowlarr reaches it at http://flaresolverr:8191
+    # No t3_proxy / labels — no UI worth exposing
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: ${LOG_LEVEL}
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: none

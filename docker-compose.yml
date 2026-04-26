@@ -94,9 +94,9 @@ include:
   - compose/sonarr.yml
   - compose/radarr.yml
   - compose/lidarr.yml
-#  - compose/bazarr.yml
-#  - compose/flaresolverr.yml
-#  - compose/unpackerr.yml
+  - compose/bazarr.yml
+  - compose/flaresolverr.yml
+  - compose/unpackerr.yml
 
   # --- MEDIA SERVER ---
 #  - compose/plex.yml

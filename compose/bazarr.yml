@@ -1,0 +1,26 @@
+services:
+  bazarr:
+    container_name: bazarr
+    image: lscr.io/linuxserver/bazarr:1.5.1
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${BAZARR_IP}
+      t3_proxy:
+    volumes:
+      - ${DOCKERDIR}/appdata/bazarr:/config
+      - ${DATADIR_MEDIA}:/data/media
+      # No /data/downloads — Bazarr only reads media library
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bazarr-rtr.entrypoints=websecure
+      - traefik.http.routers.bazarr-rtr.rule=Host(`${BAZARR_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.bazarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.bazarr-rtr.service=bazarr-svc
+      - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767
