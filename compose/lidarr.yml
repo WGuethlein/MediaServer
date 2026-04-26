@@ -1,0 +1,26 @@
+services:
+  lidarr:
+    container_name: lidarr
+    image: lscr.io/linuxserver/lidarr:2.9.6
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${LIDARR_IP}
+      t3_proxy:
+    volumes:
+      - ${DOCKERDIR}/appdata/lidarr:/config
+      - ${DATADIR_MEDIA}:/data/media
+      - ${DATADIR_DOWNLOADS}:/data/downloads
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.lidarr-rtr.entrypoints=websecure
+      - traefik.http.routers.lidarr-rtr.rule=Host(`${LIDARR_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.lidarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.lidarr-rtr.service=lidarr-svc
+      - traefik.http.services.lidarr-svc.loadbalancer.server.port=8686

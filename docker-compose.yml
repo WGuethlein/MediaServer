@@ -90,10 +90,10 @@ include:
   - compose/sabnzbd.yml
 
   # --- *ARR SUITE ---
-#  - compose/prowlarr.yml
-#  - compose/sonarr.yml
-#  - compose/radarr.yml
-#  - compose/lidarr.yml
+  - compose/prowlarr.yml
+  - compose/sonarr.yml
+  - compose/radarr.yml
+  - compose/lidarr.yml
 #  - compose/bazarr.yml
 #  - compose/flaresolverr.yml
 #  - compose/unpackerr.yml

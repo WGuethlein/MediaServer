@@ -1,0 +1,25 @@
+services:
+  prowlarr:
+    container_name: prowlarr
+    image: lscr.io/linuxserver/prowlarr:1.30.2
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${PROWLARR_IP}
+      t3_proxy:
+    volumes:
+      - ${DOCKERDIR}/appdata/prowlarr:/config
+      # Prowlarr has no media — config only
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prowlarr-rtr.entrypoints=websecure
+      - traefik.http.routers.prowlarr-rtr.rule=Host(`${PROWLARR_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.prowlarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.prowlarr-rtr.service=prowlarr-svc
+      - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696
