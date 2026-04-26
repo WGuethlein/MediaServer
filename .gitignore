@@ -22,3 +22,4 @@ Thumbs.db
 # Backup files from editors
 *.bak
 *.orig
+appdata/homepage/services.yaml

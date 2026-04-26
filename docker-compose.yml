@@ -100,13 +100,13 @@ include:
 
   # --- MEDIA SERVER ---
   - compose/plex.yml
-#  - compose/tdarr.yml
+  - compose/tdarr.yml
 
   # --- REQUESTS & DASHBOARDS ---
-#  - compose/overseerr.yml
+  - compose/seerr.yml
 #  - compose/audiobookrequest.yml
 #  - compose/listenarr.yml
-#  - compose/homepage.yml
+  - compose/homepage.yml
 
   # --- OPS / OBSERVABILITY ---
 #  - compose/diun.yml

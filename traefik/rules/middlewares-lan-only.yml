@@ -1,0 +1,9 @@
+http:
+  middlewares:
+    lan-only:
+      ipAllowList:
+        sourceRange:
+          - 192.168.0.0/16    # your LAN
+          - 172.16.0.0/12     # Docker bridges (so other containers can reach it)
+          - 10.0.0.0/8        # in case you have other RFC1918 ranges
+          - 127.0.0.1/32

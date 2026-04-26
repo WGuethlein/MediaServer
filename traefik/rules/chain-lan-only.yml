@@ -1,0 +1,8 @@
+http:
+  middlewares:
+    chain-lan-only:
+      chain:
+        middlewares:
+          - middlewares-rate-limit@file
+          - middlewares-secure-headers@file
+          - lan-only@file

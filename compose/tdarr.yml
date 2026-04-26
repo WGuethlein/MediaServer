@@ -1,0 +1,71 @@
+services:
+  tdarr:
+    container_name: tdarr
+    image: ghcr.io/haveagitgat/tdarr:2.42.01
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${TDARR_IP}
+      t3_proxy:
+    # No published ports — reached via Traefik (WebUI) and node uses container DNS (server port)
+    volumes:
+      - ${DOCKERDIR}/appdata/tdarr/server:/app/server
+      - ${DOCKERDIR}/appdata/tdarr/configs:/app/configs
+      - ${DOCKERDIR}/appdata/tdarr/logs:/app/logs
+      - ${DATADIR_MEDIA}:/data/media
+    tmpfs:
+      # Transcode scratch on tmpfs — big files, lots of churn
+      - /temp:size=8G,mode=1777
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      UMASK_SET: ${TDARR_UMASK_SET}
+      serverIP: 0.0.0.0
+      serverPort: ${TDARR_PORT_SERVER}
+      webUIPort: ${TDARR_PORT_WEBUI}
+      # CRITICAL: disable internal node — we run the external node container instead
+      internalNode: "false"
+      inContainer: "true"
+      ffmpegVersion: "7"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tdarr-rtr.entrypoints=websecure
+      - traefik.http.routers.tdarr-rtr.rule=Host(`${TDARR_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.tdarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.tdarr-rtr.service=tdarr-svc
+      - traefik.http.services.tdarr-svc.loadbalancer.server.port=8265
+
+  tdarr-node:
+    container_name: tdarr-node
+    image: ghcr.io/haveagitgat/tdarr_node:2.42.01
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    runtime: nvidia
+    depends_on:
+      - tdarr
+    networks:
+      default:
+    # No ports — node only talks to server, no UI
+    volumes:
+      - ${DOCKERDIR}/appdata/tdarr/configs:/app/configs
+      - ${DOCKERDIR}/appdata/tdarr/logs:/app/logs
+      - ${DATADIR_MEDIA}:/data/media
+    tmpfs:
+      - /temp:size=8G,mode=1777
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+      UMASK_SET: ${TDARR_UMASK_SET}
+      nodeName: TdarrNode
+      serverIP: tdarr           # container DNS to server
+      serverPort: ${TDARR_PORT_SERVER}
+      inContainer: "true"
+      ffmpegVersion: "7"
+      # NVIDIA passthrough
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility

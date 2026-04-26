@@ -1,0 +1,33 @@
+services:
+  seerr:
+    container_name: seerr
+    image: ghcr.io/seerr-team/seerr:v3.2.0
+    init: true                  # REQUIRED — Seerr no longer ships its own init
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${SEERR_IP}
+      t3_proxy:
+    # No published port — Traefik route only
+    volumes:
+      - ${DOCKERDIR}/appdata/seerr:/app/config   # NOTE: /app/config, not /config
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+      PORT: 5055
+      # NO PUID/PGID — Seerr runs as `node` user (UID 1000) hardcoded
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5055/api/v1/settings/public"]
+      interval: 15s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.seerr-rtr.entrypoints=websecure
+      - traefik.http.routers.seerr-rtr.rule=Host(`${SEERR_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.seerr-rtr.middlewares=chain-no-auth@file
+      - traefik.http.routers.seerr-rtr.service=seerr-svc
+      - traefik.http.services.seerr-svc.loadbalancer.server.port=5055
