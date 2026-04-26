@@ -1,0 +1,17 @@
+http:
+  routers:
+    plex-rtr:
+      entryPoints:
+        - websecure
+      rule: "Host(`plex.geet.dev`)"
+      service: plex-svc
+      middlewares:
+        - chain-no-auth@file
+      tls: {}
+
+  services:
+    plex-svc:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.108:32400"
+        passHostHeader: true

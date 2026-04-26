@@ -1,0 +1,41 @@
+services:
+  plex:
+    container_name: plex
+    image: plexinc/pms-docker:1.43.0.10492-121068a07
+    restart: unless-stopped
+    # Host networking — required for GDM/DLNA/Bonjour LAN discovery.
+    # Plex is NOT on any docker network; not reachable by container DNS.
+    # Other containers reach Plex at http://192.168.1.108:32400
+    network_mode: host
+    runtime: nvidia
+    # NO ports: — host networking exposes them all already
+    devices:
+      # Optional: explicit GPU device passthrough (covered by runtime: nvidia, here for clarity)
+      - /dev/nvidia0:/dev/nvidia0
+      - /dev/nvidiactl:/dev/nvidiactl
+      - /dev/nvidia-uvm:/dev/nvidia-uvm
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools
+      - /dev/nvidia-modeset:/dev/nvidia-modeset
+    volumes:
+      - ${DOCKERDIR}/appdata/plex:/config
+      - ${DATADIR_MEDIA}:/data/media
+      # Transcode dir on tmpfs (defined below)
+    tmpfs:
+      - /transcode:size=4G,mode=1777
+    environment:
+      TZ: ${TZ}
+      HOSTNAME: mediaserver
+      # PLEX_CLAIM only used on first boot to link to your account
+      PLEX_CLAIM_FILE: /run/secrets/plex_claim
+      # Plex docs say PLEX_UID/PLEX_GID, not PUID/PGID
+      PLEX_UID: ${PUID}
+      PLEX_GID: ${PGID}
+      ADVERTISE_IP: "http://${SERVER_IP}:32400/"
+      ALLOWED_NETWORKS: ${LOCAL_IPS}
+      # Tell Plex its transcoder dir
+      PLEX_TRANSCODE_DIR: /transcode
+      # NVIDIA passthrough vars
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    secrets:
+      - plex_claim

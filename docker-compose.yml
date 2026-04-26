@@ -99,7 +99,7 @@ include:
   - compose/unpackerr.yml
 
   # --- MEDIA SERVER ---
-#  - compose/plex.yml
+  - compose/plex.yml
 #  - compose/tdarr.yml
 
   # --- REQUESTS & DASHBOARDS ---
