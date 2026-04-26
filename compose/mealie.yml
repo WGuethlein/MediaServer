@@ -1,0 +1,40 @@
+services:
+  mealie:
+    container_name: mealie
+    image: ghcr.io/mealie-recipes/mealie:v3.16.0
+    restart: unless-stopped
+    mem_limit: ${MEALIE_MEMORY}    # honors the MEALIE_MEMORY knob from .env
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${MEALIE_IP}
+      t3_proxy:
+    # No published port — Traefik only
+    volumes:
+      - ${DOCKERDIR}/appdata/mealie:/app/data
+    environment:
+      TZ: ${TZ}
+      ALLOW_SIGNUP: ${MEALIE_ALLOW_SIGNUP}
+      BASE_URL: ${MEALIE_BASE_URL}
+      # Database: SQLite (default, no env needed). For Postgres, add DB_ENGINE=postgres + creds.
+      # OIDC via Authelia
+      OIDC_AUTH_ENABLED: "true"
+      OIDC_CONFIGURATION_URL: https://auth.geet.dev/.well-known/openid-configuration
+      OIDC_CLIENT_ID: mealie
+      OIDC_CLIENT_SECRET_FILE: /run/secrets/mealie_oidc_client_secret
+      OIDC_AUTO_REDIRECT: "false"      # Show login page with both local + OIDC options
+      OIDC_PROVIDER_NAME: Authelia
+      OIDC_SIGNUP_ENABLED: "true"      # Auto-create Mealie users from Authelia logins
+      OIDC_USER_GROUP: family          # Authelia group required for login (set in Authelia users db)
+      OIDC_ADMIN_GROUP: admins
+    secrets:
+      - mealie_oidc_client_secret
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.mealie-rtr.entrypoints=websecure
+      - traefik.http.routers.mealie-rtr.rule=Host(`${MEALIE_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.mealie-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.mealie-rtr.service=mealie-svc
+      - traefik.http.services.mealie-svc.loadbalancer.server.port=9000

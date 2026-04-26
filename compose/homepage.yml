@@ -20,6 +20,8 @@ services:
       PUID: ${PUID}
       PGID: ${PGID}
       HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS}
+      HOMEPAGE_VAR_AUDIOBOOKSHELF_API_KEY: ${AUDIOBOOKSHELF_API_KEY}
+      HOMEPAGE_VAR_MEALIE_API_KEY: ${MEALIE_API_KEY}
     labels:
       - traefik.enable=true
       - traefik.http.routers.homepage-rtr.entrypoints=websecure

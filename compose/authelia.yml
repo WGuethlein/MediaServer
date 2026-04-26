@@ -18,11 +18,7 @@ services:
       AUTHELIA_SESSION_SECRET_FILE: /run/secrets/authelia_session_secret
       AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/authelia_storage_encryption_key
       AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE: /run/secrets/authelia_oidc_hmac_secret
-      AUTHELIA_IDENTITY_PROVIDERS_OIDC_ISSUER_PRIVATE_KEY_FILE: /run/secrets/authelia_oidc_issuer_private_key
-      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_KEY_FILE: /run/secrets/authelia_oidc_issuer_private_key
-      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_KEY_ID: 'main-rsa'
-      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_ALGORITHM: 'RS256'
-      AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS_0_USE: 'sig'
+      X_AUTHELIA_CONFIG_FILTERS: template
     secrets:
       - authelia_jwt_secret
       - authelia_session_secret

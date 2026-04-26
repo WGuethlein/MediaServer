@@ -1,0 +1,30 @@
+services:
+  audiobookshelf:
+    container_name: audiobookshelf
+    image: ghcr.io/advplyr/audiobookshelf:2.30.0
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${AUDIOBOOKSHELF_IP}
+      t3_proxy:
+    # No published port — Traefik only
+    volumes:
+      - ${DOCKERDIR}/appdata/audiobookshelf/config:/config
+      - ${DOCKERDIR}/appdata/audiobookshelf/metadata:/metadata
+      - ${DATADIR_MEDIA}/audiobooks:/audiobooks
+      - ${DATADIR_MEDIA}/podcasts:/podcasts
+    environment:
+      TZ: ${TZ}
+      # ABS image runs as root by default; can switch to user mode if you want PUID:PGID enforcement
+      # See A4 for the user-namespace consideration
+    # No healthcheck — pattern matches the *arrs in this stack. Traefik gates routing on
+    # health status, and broken healthchecks silently cause 404s with no obvious cause.
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.abs-rtr.entrypoints=websecure
+      - traefik.http.routers.abs-rtr.rule=Host(`${AUDIOBOOKSHELF_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.abs-rtr.middlewares=chain-no-auth@file
+      - traefik.http.routers.abs-rtr.service=abs-svc
+      - traefik.http.services.abs-svc.loadbalancer.server.port=80

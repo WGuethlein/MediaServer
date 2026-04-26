@@ -104,8 +104,9 @@ include:
 
   # --- REQUESTS & DASHBOARDS ---
   - compose/seerr.yml
-#  - compose/audiobookrequest.yml
-#  - compose/listenarr.yml
+  - compose/audiobookrequest.yml
+  - compose/audiobookshelf.yml
+  - compose/listenarr.yml
   - compose/homepage.yml
 
   # --- OPS / OBSERVABILITY ---
@@ -113,5 +114,5 @@ include:
 #  - compose/dozzle.yml
 
   # --- OTHER ---
-#  - compose/mealie.yml
-#  - compose/minecraft.yml
+  - compose/mealie.yml
+  - compose/minecraft.yml

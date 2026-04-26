@@ -1,0 +1,29 @@
+
+services:
+  audiobookrequest:
+    container_name: audiobookrequest
+    image: markbeep/audiobookrequest:1.10.4
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${AUDIOBOOKREQUEST_IP}
+      downloads:
+      t3_proxy:
+    # No published port — Traefik only
+    volumes:
+      - ${DOCKERDIR}/appdata/audiobookrequest:/config
+      # ABR doesn't need access to media files itself — it triggers Prowlarr/SAB/qBit
+      # and tells ABS to rescan. So no /data mount needed.
+    environment:
+      TZ: ${TZ}
+      ABR_APP__PORT: 8765
+    # No healthcheck — see ABS note. Pattern matches the *arrs.
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.abr-rtr.entrypoints=websecure
+      - traefik.http.routers.abr-rtr.rule=Host(`${AUDIOBOOKREQUEST_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.abr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.abr-rtr.service=abr-svc
+      - traefik.http.services.abr-svc.loadbalancer.server.port=8765

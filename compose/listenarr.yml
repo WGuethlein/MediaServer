@@ -1,0 +1,28 @@
+services:
+  listenarr:
+    container_name: listenarr
+    image: therobbiedavis/listenarr:canary
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${LISTENARR_IP}
+      downloads:
+      t3_proxy:
+    # No published port — Traefik only
+    volumes:
+      - ${DOCKERDIR}/appdata/listenarr:/app/config
+      - ${DATADIR_MEDIA}/audiobooks:/audiobooks
+      - ${DATADIR_DOWNLOADS}:/data/downloads
+    environment:
+      TZ: ${TZ}
+      LISTENARR_PUBLIC_URL: https://${LISTENARR_SUBDOMAIN}.${DOMAINNAME_1}
+    # No healthcheck — see ABS note. Pattern matches the *arrs.
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.listenarr-rtr.entrypoints=websecure
+      - traefik.http.routers.listenarr-rtr.rule=Host(`${LISTENARR_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.listenarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.listenarr-rtr.service=listenarr-svc
+      - traefik.http.services.listenarr-svc.loadbalancer.server.port=4545
