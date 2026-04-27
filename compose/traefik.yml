@@ -6,8 +6,10 @@ services:
     security_opt:
       - no-new-privileges:true
     depends_on:
-      - socket-proxy
-      - crowdsec
+      socket-proxy:
+        condition: service_healthy
+      crowdsec:
+        condition: service_healthy
     networks:
       t3_proxy:
         ipv4_address: ${TRAEFIK_IP}

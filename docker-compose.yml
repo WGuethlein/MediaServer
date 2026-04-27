@@ -72,6 +72,8 @@ secrets:
     file: ${DOCKERDIR}/secrets/diun_discord_webhook
   mealie_oidc_client_secret:
     file: ${DOCKERDIR}/secrets/mealie_oidc_client_secret
+  restic_password:
+    file: ${DOCKERDIR}/secrets/restic_password
 
 ########################################
 # SERVICES — included from compose/*.yml

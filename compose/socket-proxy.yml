@@ -1,5 +1,11 @@
 services:
   socket-proxy:
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2375/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     container_name: socket-proxy
     image: tecnativa/docker-socket-proxy:0.3.0
     restart: unless-stopped

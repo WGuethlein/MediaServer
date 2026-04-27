@@ -1,5 +1,11 @@
 services:
   crowdsec:
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     container_name: crowdsec
     image: crowdsecurity/crowdsec:v1.7.7
     restart: unless-stopped
