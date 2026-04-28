@@ -112,7 +112,7 @@ include:
   - compose/homepage.yml
 
   # --- OPS / OBSERVABILITY ---
-#  - compose/diun.yml
+  - compose/diun.yml
 #  - compose/dozzle.yml
 
   # --- OTHER ---

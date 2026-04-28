@@ -1,0 +1,32 @@
+services:
+  diun:
+    container_name: diun
+    image: ghcr.io/crazy-max/diun:4.30
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${DIUN_IP}
+      socket_proxy:                    # to enumerate containers
+    volumes:
+      - ${DOCKERDIR}/appdata/diun:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+      LOG_JSON: "false"
+      DIUN_WATCH_WORKERS: 5
+      DIUN_WATCH_SCHEDULE: ${DIUN_SCHEDULE}    # 0 3 * * *
+      DIUN_WATCH_JITTER: 30s
+      # Discover containers via socket-proxy (not direct socket access)
+      DIUN_PROVIDERS_DOCKER_ENDPOINT: tcp://socket-proxy:2375
+      DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT: "true"      # ← all containers watched unless labeled out
+      # Send via Discord webhook
+      DIUN_NOTIF_DISCORD_WEBHOOKURL: ${DIUN_DISCORD_WEBHOOK}
+      DIUN_NOTIF_DISCORD_MENTIONS: ""
+      DIUN_NOTIF_DISCORD_TIMEOUT: 10s
+      DIUN_NOTIF_DISCORD_TEMPLATEBODY: |
+        Docker tag {{ .Entry.Image }} which you subscribed to through the {{ .Entry.Provider }} provider has been released
+      DIUN_DEFAULTS_NOTIFYON: "new,update"
