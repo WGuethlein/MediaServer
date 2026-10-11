@@ -1,0 +1,12 @@
+# Admin apps (2026-10-11): reachable only from the LAN or Tailscale, then Authelia login.
+# Remote access = Tailscale (wyatt-mon subnet router + split DNS for geet.dev).
+http:
+  middlewares:
+    chain-authelia-lan:
+      chain:
+        middlewares:
+          - lan-only@file
+          - middlewares-rate-limit
+          - middlewares-secure-headers
+          - middlewares-crowdsec
+          - middlewares-authelia

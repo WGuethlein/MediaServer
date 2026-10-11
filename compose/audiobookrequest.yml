@@ -24,6 +24,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.abr-rtr.entrypoints=websecure
       - traefik.http.routers.abr-rtr.rule=Host(`${AUDIOBOOKREQUEST_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.abr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.abr-rtr.middlewares=chain-tinyauth@file
       - traefik.http.routers.abr-rtr.service=abr-svc
       - traefik.http.services.abr-svc.loadbalancer.server.port=8765

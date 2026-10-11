@@ -18,23 +18,24 @@ services:
       ALLOW_SIGNUP: ${MEALIE_ALLOW_SIGNUP}
       BASE_URL: ${MEALIE_BASE_URL}
       # Database: SQLite (default, no env needed). For Postgres, add DB_ENGINE=postgres + creds.
-      # OIDC via Authelia
+      # OIDC via tinyauth (Google login), 2026-10-11. Users are matched by email (OIDC_USER_CLAIM default).
+      # Google has no groups, so no OIDC_USER_GROUP/OIDC_ADMIN_GROUP; existing admin flags in Mealie are kept.
+      # Who may log in is decided by the tinyauth whitelist. Local login fallback: https://food.geet.dev/login?direct=1
       OIDC_AUTH_ENABLED: "true"
-      OIDC_CONFIGURATION_URL: https://auth.geet.dev/.well-known/openid-configuration
-      OIDC_CLIENT_ID: mealie
-      OIDC_CLIENT_SECRET_FILE: /run/secrets/mealie_oidc_client_secret
-      OIDC_AUTO_REDIRECT: "false"      # Show login page with both local + OIDC options
-      OIDC_PROVIDER_NAME: Authelia
-      OIDC_SIGNUP_ENABLED: "true"      # Auto-create Mealie users from Authelia logins
-      OIDC_USER_GROUP: family          # Authelia group required for login (set in Authelia users db)
-      OIDC_ADMIN_GROUP: admins
+      OIDC_CONFIGURATION_URL: https://${TINYAUTH_SUBDOMAIN}.${DOMAINNAME_1}/.well-known/openid-configuration
+      OIDC_CLIENT_ID: ${TINYAUTH_MEALIE_CLIENT_ID}
+      OIDC_CLIENT_SECRET_FILE: /run/secrets/tinyauth_mealie_oidc_secret
+      OIDC_PROVIDER_NAME: Google
+      OIDC_AUTO_REDIRECT: "false"      # login page shows both "Login with Google" and local login
+      OIDC_SIGNUP_ENABLED: "false"     # only existing Mealie users (matched by email) can sign in
+      OIDC_SCOPES_OVERRIDE: "openid profile email"
     secrets:
-      - mealie_oidc_client_secret
+      - tinyauth_mealie_oidc_secret
     labels:
       - traefik.enable=true
       - traefik.docker.network=t3_proxy
       - traefik.http.routers.mealie-rtr.entrypoints=websecure
       - traefik.http.routers.mealie-rtr.rule=Host(`${MEALIE_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.mealie-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.mealie-rtr.middlewares=chain-no-auth@file
       - traefik.http.routers.mealie-rtr.service=mealie-svc
       - traefik.http.services.mealie-svc.loadbalancer.server.port=9000

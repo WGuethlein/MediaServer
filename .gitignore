@@ -23,3 +23,6 @@ Thumbs.db
 *.bak
 *.orig
 appdata/homepage/services.yaml
+
+# dated backups (e.g. .env.bak.2026-10-11) must never be committed
+*.bak.*

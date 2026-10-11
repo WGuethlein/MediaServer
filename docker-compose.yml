@@ -75,6 +75,14 @@ secrets:
   restic_password:
     file: ${DOCKERDIR}/secrets/restic_password
 
+  # tinyauth (2026-10-11)
+  google_oauth_client_secret:
+    file: ${DOCKERDIR}/secrets/google_oauth_client_secret
+  tinyauth_mealie_oidc_secret:
+    file: ${DOCKERDIR}/secrets/tinyauth_mealie_oidc_secret
+  tinyauth_users:
+    file: ${DOCKERDIR}/secrets/tinyauth_users
+
 ########################################
 # SERVICES — included from compose/*.yml
 ########################################
@@ -82,7 +90,8 @@ include:
   # --- CORE INFRA ---
   - compose/socket-proxy.yml
   - compose/traefik.yml
-  - compose/authelia.yml
+#  - compose/authelia.yml   # removed 2026-10-11: replaced by tinyauth (config kept in appdata/authelia)
+  - compose/tinyauth.yml
   - compose/crowdsec.yml
   - compose/cloudflare-ddns.yml
 
@@ -118,3 +127,4 @@ include:
   # --- OTHER ---
   - compose/mealie.yml
   - compose/minecraft.yml
+  - compose/spiderfoot.yml

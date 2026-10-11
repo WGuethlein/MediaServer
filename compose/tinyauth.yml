@@ -1,0 +1,70 @@
+# tinyauth — Google login (forwardAuth) + OIDC provider for Mealie. Added 2026-10-11.
+# Design: E:\Code\HomeAutomation\research\05-auth-google-login.md
+#  - OAuth whitelist is an EXACT email match (verified in v5.2.0 source); empty = anyone, so it is always set.
+#  - Admin apps (phase 2) get per-app owner-only whitelists via TINYAUTH_APPS_<NAME>_*.
+services:
+  tinyauth:
+    container_name: tinyauth
+    image: ghcr.io/tinyauthapp/tinyauth:v5.2.0     # pinned; Diun notifies on new tags
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      t3_proxy:
+        ipv4_address: ${TINYAUTH_IP}
+    volumes:
+      - ${DOCKERDIR}/appdata/tinyauth:/data          # SQLite sessions + OIDC signing keys
+    secrets:
+      - google_oauth_client_secret
+      - tinyauth_mealie_oidc_secret
+      - tinyauth_users
+    environment:
+      TZ: ${TZ}
+      TINYAUTH_APPURL: https://${TINYAUTH_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_DATABASE_PATH: /data/tinyauth.db
+      TINYAUTH_LOG_LEVEL: info
+      TINYAUTH_LABELPROVIDER: "none"                 # no Docker socket access
+      TINYAUTH_AUTH_SECURECOOKIE: "true"
+      TINYAUTH_AUTH_SESSIONEXPIRY: "604800"          # 7 days
+      TINYAUTH_AUTH_TRUSTEDPROXIES: ${TRAEFIK_IP}
+      TINYAUTH_AUTH_USERSFILE: /run/secrets/tinyauth_users   # break-glass local user (password + TOTP)
+      # Google login
+      TINYAUTH_OAUTH_PROVIDERS_GOOGLE_CLIENTID: ${GOOGLE_OAUTH_CLIENT_ID}
+      TINYAUTH_OAUTH_PROVIDERS_GOOGLE_CLIENTSECRETFILE: /run/secrets/google_oauth_client_secret
+      TINYAUTH_OAUTH_WHITELIST: ${TINYAUTH_OAUTH_WHITELIST}
+      # no auto-redirect: login page must also show the break-glass username/password form
+      # TINYAUTH_OAUTH_AUTOREDIRECT: "google"
+      # OIDC provider
+      TINYAUTH_OIDC_PRIVATEKEYPATH: /data/oidc_key.pem
+      TINYAUTH_OIDC_PUBLICKEYPATH: /data/oidc_key.pub
+      TINYAUTH_OIDC_CLIENTS_MEALIE_CLIENTID: ${TINYAUTH_MEALIE_CLIENT_ID}
+      TINYAUTH_OIDC_CLIENTS_MEALIE_CLIENTSECRETFILE: /run/secrets/tinyauth_mealie_oidc_secret
+      TINYAUTH_OIDC_CLIENTS_MEALIE_TRUSTEDREDIRECTURIS: https://${MEALIE_SUBDOMAIN}.${DOMAINNAME_1}/login
+      TINYAUTH_OIDC_CLIENTS_MEALIE_NAME: Mealie
+      # Admin apps: owner-only (exact email). Keep in sync with routers using chain-tinyauth-lan.
+      TINYAUTH_APPS_SONARR_CONFIG_DOMAIN: ${SONARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_SONARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_RADARR_CONFIG_DOMAIN: ${RADARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_RADARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_LIDARR_CONFIG_DOMAIN: ${LIDARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_LIDARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_PROWLARR_CONFIG_DOMAIN: ${PROWLARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_PROWLARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_BAZARR_CONFIG_DOMAIN: ${BAZARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_BAZARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_SAB_CONFIG_DOMAIN: ${SABNZBD_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_SAB_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_TDARR_CONFIG_DOMAIN: ${TDARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_TDARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_LISTENARR_CONFIG_DOMAIN: ${LISTENARR_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_LISTENARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+      TINYAUTH_APPS_TRAEFIK_CONFIG_DOMAIN: ${TRAEFIK_SUBDOMAIN}.${DOMAINNAME_1}
+      TINYAUTH_APPS_TRAEFIK_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.tinyauth-rtr.entrypoints=websecure
+      - traefik.http.routers.tinyauth-rtr.rule=Host(`${TINYAUTH_SUBDOMAIN}.${DOMAINNAME_1}`)
+      - traefik.http.routers.tinyauth-rtr.middlewares=chain-no-auth@file
+      - traefik.http.routers.tinyauth-rtr.service=tinyauth-svc
+      - traefik.http.services.tinyauth-svc.loadbalancer.server.port=3000

@@ -22,6 +22,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.lidarr-rtr.entrypoints=websecure
       - traefik.http.routers.lidarr-rtr.rule=Host(`${LIDARR_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.lidarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.lidarr-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.lidarr-rtr.service=lidarr-svc
       - traefik.http.services.lidarr-svc.loadbalancer.server.port=8686

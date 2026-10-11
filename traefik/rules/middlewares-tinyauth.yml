@@ -1,0 +1,11 @@
+# tinyauth forwardAuth (2026-10-11). Endpoint verified in v5.2.0 source: /api/auth/:proxy
+http:
+  middlewares:
+    middlewares-tinyauth:
+      forwardAuth:
+        address: "http://tinyauth:3000/api/auth/traefik"
+        authResponseHeaders:
+          - Remote-User
+          - Remote-Name
+          - Remote-Email
+          - Remote-Groups

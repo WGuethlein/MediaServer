@@ -34,7 +34,7 @@ services:
       - traefik.enable=true
       - traefik.http.routers.tdarr-rtr.entrypoints=websecure
       - traefik.http.routers.tdarr-rtr.rule=Host(`${TDARR_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.tdarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.tdarr-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.tdarr-rtr.service=tdarr-svc
       - traefik.http.services.tdarr-svc.loadbalancer.server.port=8265
 

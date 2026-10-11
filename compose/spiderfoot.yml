@@ -1,0 +1,31 @@
+services:
+  spiderfoot:
+    container_name: spiderfoot
+    # Upstream (smicallef/spiderfoot) is effectively unmaintained; this is a
+    # community image with a non-root runtime + versioned tags.
+    # Pin the tag — do NOT use :latest, so Diun can notify you of updates.
+    image: joshuapfritz/spiderfoot:v4.0
+    restart: unless-stopped
+    mem_limit: ${SPIDERFOOT_MEM_LIMIT}     # matches your PLEX_MEM_LIMIT / *_MEM_LIMIT convention
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: ${SPIDERFOOT_IP}
+      t3_proxy:
+    # No published port — Traefik only. The UI has NO built-in auth, so it must
+    # never be reachable except through the chain-lan-only middleware below.
+    volumes:
+      - ${DOCKERDIR}/appdata/spiderfoot:/data
+    environment:
+      TZ: ${TZ}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.spiderfoot-rtr.entrypoints=websecure
+      - traefik.http.routers.spiderfoot-rtr.rule=Host(`${SPIDERFOOT_SUBDOMAIN}.${DOMAINNAME_1}`)
+      # LAN-only — same middleware Homepage uses. NOT chain-authelia: this service
+      # is intentionally unreachable from the WAN, gated at Traefik by source IP.
+      - traefik.http.routers.spiderfoot-rtr.middlewares=chain-lan-only@file
+      - traefik.http.routers.spiderfoot-rtr.service=spiderfoot-svc
+      - traefik.http.services.spiderfoot-svc.loadbalancer.server.port=5001

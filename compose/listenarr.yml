@@ -23,6 +23,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.listenarr-rtr.entrypoints=websecure
       - traefik.http.routers.listenarr-rtr.rule=Host(`${LISTENARR_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.listenarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.listenarr-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.listenarr-rtr.service=listenarr-svc
       - traefik.http.services.listenarr-svc.loadbalancer.server.port=4545

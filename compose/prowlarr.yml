@@ -20,6 +20,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.prowlarr-rtr.entrypoints=websecure
       - traefik.http.routers.prowlarr-rtr.rule=Host(`${PROWLARR_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.prowlarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.prowlarr-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.prowlarr-rtr.service=prowlarr-svc
       - traefik.http.services.prowlarr-svc.loadbalancer.server.port=9696

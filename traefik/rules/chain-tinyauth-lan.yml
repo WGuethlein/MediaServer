@@ -1,0 +1,13 @@
+# Admin apps: LAN/Tailscale only, then Google login. 2026-10-11
+# OWNER-ONLY is enforced in tinyauth per app (TINYAUTH_APPS_<NAME>_* in compose/tinyauth.yml).
+# Any NEW app on this chain MUST get such a block, or every whitelisted (family) account gets in.
+http:
+  middlewares:
+    chain-tinyauth-lan:
+      chain:
+        middlewares:
+          - lan-only@file
+          - middlewares-rate-limit
+          - middlewares-secure-headers
+          - middlewares-crowdsec
+          - middlewares-tinyauth

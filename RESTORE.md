@@ -4,7 +4,7 @@ In the event of disk failure or catastrophic config corruption.
 
 ## Prerequisites
 - Restic password (memorized or stored externally — NOT on the dead host)
-- Restic repo accessible at /srv/backups/restic-repo (or wherever you copied it)
+- Restic repo accessible at /mnt/data/backups/restic-repo (or wherever you copied it)
 - Docker installed on the new/recovered host
 
 ## Steps
@@ -18,10 +18,10 @@ In the event of disk failure or catastrophic config corruption.
 2. List available snapshots:
 ```bash
    docker run --rm \
-     -v /srv/backups:/srv/backups \
+     -v /mnt/data/backups:/mnt/data/backups \
      -v /tmp/restic_password:/run/secrets/restic_password:ro \
      -e RESTIC_PASSWORD_FILE=/run/secrets/restic_password \
-     -e RESTIC_REPOSITORY=/srv/backups/restic-repo \
+     -e RESTIC_REPOSITORY=/mnt/data/backups/restic-repo \
      restic/restic:0.17.3 \
      snapshots
 ```
@@ -30,11 +30,11 @@ In the event of disk failure or catastrophic config corruption.
 ```bash
    mkdir -p /home/docker_user/mediaserver
    docker run --rm \
-     -v /srv/backups:/srv/backups \
+     -v /mnt/data/backups:/mnt/data/backups \
      -v /home/docker_user/mediaserver:/restore-target \
      -v /tmp/restic_password:/run/secrets/restic_password:ro \
      -e RESTIC_PASSWORD_FILE=/run/secrets/restic_password \
-     -e RESTIC_REPOSITORY=/srv/backups/restic-repo \
+     -e RESTIC_REPOSITORY=/mnt/data/backups/restic-repo \
      restic/restic:0.17.3 \
      restore latest \
        --target /restore-target \

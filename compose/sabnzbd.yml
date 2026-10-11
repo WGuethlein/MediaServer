@@ -1,7 +1,7 @@
 services:
   sabnzbd:
     container_name: sabnzbd
-    image: lscr.io/linuxserver/sabnzbd:4.4.1
+    image: lscr.io/linuxserver/sabnzbd:5.0.3
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -23,6 +23,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.sabnzbd-rtr.entrypoints=websecure
       - traefik.http.routers.sabnzbd-rtr.rule=Host(`${SABNZBD_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.sabnzbd-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.sabnzbd-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.sabnzbd-rtr.service=sabnzbd-svc
       - traefik.http.services.sabnzbd-svc.loadbalancer.server.port=8080

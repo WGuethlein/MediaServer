@@ -1,44 +1,40 @@
 services:
-  minecraft:
-    container_name: minecraft
-    image: itzg/minecraft-server:java21
+  gtnh:
+    container_name: gtnh
+    image: itzg/minecraft-server:java25
     restart: unless-stopped
-    # tty + stdin_open are required for `docker attach minecraft` to give a working MC console.
-    # Without them, attach connects but you can't see output or send commands. mc-send-to-console
-    # works either way, but interactive console (which most MC admins use) needs both.
     tty: true
     stdin_open: true
+    stop_grace_period: 3m
     security_opt:
       - no-new-privileges:true
     networks:
       default:
-    # Game port published direct to host — no Traefik for raw TCP
     ports:
-      - ${MINECRAFT_PORT}:25565/tcp
+      - ${GTNH_PORT}:25565/tcp
     volumes:
-      - ${DOCKERDIR}/appdata/minecraft:/data
+      - ${DOCKERDIR}/appdata/gtnh:/data
     environment:
       TZ: ${TZ}
-      EULA: ${MC_EULA}                 # MUST be "TRUE"
-      TYPE: ${MC_TYPE}                 # PAPER, VANILLA, FORGE, FABRIC, FTB
-      VERSION: ${MC_VERSION}           # LATEST or e.g. 1.21.4
-      MEMORY: ${MC_MEMORY}             # JVM heap
-      MAX_PLAYERS: ${MC_MAX_PLAYERS}
-      DIFFICULTY: ${MC_DIFFICULTY}
-      MOTD: ${MC_MOTD}
-      # FTB modpack — itzg image reads these only when TYPE=FTB
-      FTB_MODPACK_ID: ${FTB_MODPACK_ID}
-      FTB_MODPACK_VERSION_ID: ${FTB_MODPACK_VERSION_ID}
-      FTB_FORCE_REINSTALL: "false"     # Set true once if you need to recover a corrupted modpack install
-      # Networking hardening
-      ENABLE_RCON: "false"             # Don't expose RCON unless you need it
-      ONLINE_MODE: "true"              # Require Mojang authentication
-      # Resource discipline
-      USE_AIKAR_FLAGS: "true"          # JVM flags tuned for MC by Aikar (PaperMC author)
+      EULA: "TRUE"
+      TYPE: "GTNH"
+      GTNH_PACK_VERSION: "2.8.4"
+      MEMORY: ${GTNH_MEMORY}
+      MAX_PLAYERS: ${GTNH_MAX_PLAYERS}
+      MOTD: ${GTNH_MOTD}
+      MAX_TICK_TIME: "-1"
+      USE_AIKAR_FLAGS: "false"
+      ONLINE_MODE: "true"
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: ${GTNH_RCON_PASSWORD}
+      ENABLE_WHITELIST: "false"
+    deploy:
+      resources:
+        limits:
+          memory: 32G
     healthcheck:
       test: ["CMD", "mc-monitor", "status", "--host", "localhost"]
       interval: 30s
       timeout: 10s
-      start_period: 120s   # First boot downloads JAR + generates world
+      start_period: 1200s
       retries: 5
-    # No Traefik labels — raw TCP only

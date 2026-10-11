@@ -1,0 +1,10 @@
+# Public apps behind Google login (anyone on the tinyauth whitelist, incl. family). 2026-10-11
+http:
+  middlewares:
+    chain-tinyauth:
+      chain:
+        middlewares:
+          - middlewares-rate-limit
+          - middlewares-secure-headers
+          - middlewares-crowdsec
+          - middlewares-tinyauth

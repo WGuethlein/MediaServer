@@ -7,3 +7,4 @@ http:
           - 172.16.0.0/12     # Docker bridges (so other containers can reach it)
           - 10.0.0.0/8        # in case you have other RFC1918 ranges
           - 127.0.0.1/32
+          - 100.64.0.0/10      # Tailscale (CGNAT range), if Tailscale ever runs on this host

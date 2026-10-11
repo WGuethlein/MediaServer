@@ -21,6 +21,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.bazarr-rtr.entrypoints=websecure
       - traefik.http.routers.bazarr-rtr.rule=Host(`${BAZARR_SUBDOMAIN}.${DOMAINNAME_1}`)
-      - traefik.http.routers.bazarr-rtr.middlewares=chain-authelia@file
+      - traefik.http.routers.bazarr-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.bazarr-rtr.service=bazarr-svc
       - traefik.http.services.bazarr-svc.loadbalancer.server.port=6767
