@@ -152,7 +152,7 @@ function frame(now) {
 }
 
 function fire(e) {
-  if (!mapReady) return;
+  if (!mapReady) { map.once("load", () => setTimeout(() => fire(e), 50)); return; }   // replay once the map is up
   arcs.push({ coords: greatCircle([e.lon, e.lat], TARGET), color: COLORS[kind(e)], start: performance.now(), dur: 2200 });
 }
 
