@@ -1,8 +1,8 @@
 // Alloy on wyatt-serv1 — ships logs to Loki on wyatt-mon (192.168.1.73:3100). 2026-10-11.
 // Sources: systemd journal, every container's stdout/stderr (via socket-proxy, read-only),
 // Traefik access log, AdGuard replica query log.
-// If wyatt-mon is down, sends retry for ~2 h; file/journal positions only advance on read, so short
-// outages lose nothing that is still in the journal / on disk.
+// If wyatt-mon is down, sends retry for ~2 h; batches still failing after that are dropped from
+// Loki (the lines remain in serv1's journal / on disk).
 
 logging {
   level = "warn"
