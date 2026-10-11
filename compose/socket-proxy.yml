@@ -27,7 +27,7 @@ services:
       # Revoked by default — re-enable per consumer
       AUTH: 0
       SECRETS: 0
-      POST: 1            # Diun needs to issue PUT/POST against /containers (image inspect, etc.)
+      POST: 0            # 2026-10-11: no consumer writes (Traefik/Diun/Homepage only read); POST=1 would let any container on socket_proxy create containers = root
       # Not always needed — minimal grant
       BUILD: 0
       COMMIT: 0
