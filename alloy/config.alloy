@@ -101,11 +101,60 @@ loki.source.file "traefik" {
 
 loki.process "traefik" {
   stage.regex {
-    expression = "\\[(?P<ts>[^\\]]+)\\]"
+    expression = "^(?P<src_ip>\\S+) .*?\\[(?P<ts>[^\\]]+)\\]"
   }
   stage.timestamp {
     source = "ts"
     format = "02/Jan/2006:15:04:05 -0700"
+  }
+  // attacker location (DB-IP City Lite, refreshed monthly) → structured metadata, not labels.
+  // Private/Tailscale addresses are blanked first so they are not looked up.
+  stage.template {
+    source   = "src_ip"
+    template = "{{ if or (hasPrefix \"192.168.\" .Value) (hasPrefix \"10.\" .Value) (hasPrefix \"172.\" .Value) (hasPrefix \"100.\" .Value) (hasPrefix \"127.\" .Value) }}{{ else }}{{ .Value }}{{ end }}"
+  }
+  stage.geoip {
+    source  = "src_ip"
+    db      = "/geoip/dbip-city-lite.mmdb"
+    db_type = "city"
+  }
+  stage.structured_metadata {
+    regex = "geoip_.*"
+  }
+  stage.label_drop {
+    values = ["filename"]
+  }
+  forward_to = [loki.write.mon.receiver]
+}
+
+// ---------- Cowrie honeypot (fake SSH/Telnet, see compose/honeypot.yml) ----------
+local.file_match "cowrie" {
+  path_targets = [{ "__path__" = "/cowrie/cowrie.json", host = "wyatt-serv1", job = "cowrie" }]
+}
+
+loki.source.file "cowrie" {
+  targets    = local.file_match.cowrie.targets
+  forward_to = [loki.process.cowrie.receiver]
+}
+
+loki.process "cowrie" {
+  stage.json {
+    expressions = { ts = "timestamp", src_ip = "src_ip", eventid = "eventid" }
+  }
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339Nano"
+  }
+  stage.labels {
+    values = { eventid = "" }   // ~20 values: cowrie.session.connect, cowrie.login.failed, ...
+  }
+  stage.geoip {
+    source  = "src_ip"
+    db      = "/geoip/dbip-city-lite.mmdb"
+    db_type = "city"
+  }
+  stage.structured_metadata {
+    regex = "geoip_.*"
   }
   stage.label_drop {
     values = ["filename"]

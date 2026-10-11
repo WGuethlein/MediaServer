@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Attack Map</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root { --bg:#070b12; --panel:#0e1522; --line:#1d2a3d; --text:#d7e2f0; --dim:#7f8ea3;
+          --ssh:#ff4d6d; --telnet:#ff9f1c; --blocked:#4cc9f0; --web:#b388ff; --ok:#2ee59d; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+              font:14px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  header { display:flex; align-items:center; gap:24px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.08em; text-transform:uppercase; }
+  .live { display:inline-flex; align-items:center; gap:6px; color:var(--ok); font-size:12px; }
+  .live i { width:8px; height:8px; border-radius:50%; background:var(--ok); animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(46,229,157,.7)} 100%{box-shadow:0 0 0 10px rgba(46,229,157,0)} }
+  .kpis { display:flex; gap:22px; margin-left:auto; flex-wrap:wrap; }
+  .kpi b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
+  .kpi span { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+  main { display:grid; grid-template-columns:1fr 340px; height:calc(100% - 58px); }
+  #map { background:var(--bg); }
+  aside { border-left:1px solid var(--line); overflow:auto; padding:12px; display:flex; flex-direction:column; gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .card h2 { font-size:11px; margin:0 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
+  .bar { display:grid; grid-template-columns:1fr auto; gap:8px; font-size:13px; padding:2px 0; position:relative; }
+  .bar::before { content:""; position:absolute; inset:0 auto 0 0; width:var(--w); background:rgba(76,201,240,.12); border-radius:3px; }
+  .bar > * { position:relative; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar code { font-family:ui-monospace,Consolas,monospace; font-size:12px; }
+  #feed { font-family:ui-monospace,Consolas,monospace; font-size:12px; max-height:340px; overflow:auto; }
+  #feed div { padding:3px 0; border-bottom:1px solid var(--line); animation:fadein .6s; }
+  @keyframes fadein { from{background:rgba(255,77,109,.25)} to{background:transparent} }
+  .tag { display:inline-block; min-width:62px; font-size:10px; text-transform:uppercase; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--dim); }
+  .legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:-1px; }
+  .leaflet-container { background:var(--bg); }
+  .leaflet-control-attribution { background:rgba(7,11,18,.7)!important; color:var(--dim)!important; }
+  .leaflet-control-attribution a { color:var(--dim)!important; }
+  @media (max-width:800px){ main{grid-template-columns:1fr; grid-template-rows:55vh auto; height:auto} aside{border-left:0} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Live Attack Map</h1>
+  <span class="live"><i></i><span id="updated">connecting…</span></span>
+  <div class="kpis">
+    <div class="kpi"><b id="k-total">–</b><span>events (24h)</span></div>
+    <div class="kpi"><b id="k-src">–</b><span>unique attackers</span></div>
+    <div class="kpi"><b id="k-cc">–</b><span>countries</span></div>
+    <div class="kpi"><b id="k-login">–</b><span>login attempts</span></div>
+  </div>
+</header>
+<main>
+  <div id="map"></div>
+  <aside>
+    <div class="card legend">
+      <span><i style="background:var(--ssh)"></i>SSH honeypot</span>
+      <span><i style="background:var(--telnet)"></i>Telnet honeypot</span>
+      <span><i style="background:var(--blocked)"></i>Blocked at firewall</span>
+      <span><i style="background:var(--web)"></i>Web scanner</span>
+    </div>
+    <div class="card"><h2>Live feed</h2><div id="feed"></div></div>
+    <div class="card"><h2>Top countries</h2><div id="t-countries"></div></div>
+    <div class="card"><h2>Most targeted ports</h2><div id="t-ports"></div></div>
+    <div class="card"><h2>Usernames tried</h2><div id="t-users"></div></div>
+    <div class="card"><h2>Passwords tried</h2><div id="t-pass"></div></div>
+    <div class="card"><h2>Commands run (fake shell)</h2><div id="t-cmds"></div></div>
+  </aside>
+</main>
+<script>
+// Generic target (geographic centre of the contiguous US) — deliberately not the real location.
+const TARGET = [39.83, -98.58];
+const POLL_MS = 30000;
+const COLORS = { ssh: "#ff4d6d", telnet: "#ff9f1c", blocked: "#4cc9f0", web: "#b388ff" };
+
+const map = L.map("map", { worldCopyJump: true, zoomControl: false, attributionControl: true }).setView([25, 0], 2);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
+  maxZoom: 8, subdomains: "abcd",
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · IP geolocation <a href="https://db-ip.com">DB-IP</a>'
+}).addTo(map);
+L.circleMarker(TARGET, { radius: 6, color: "#2ee59d", weight: 2, fillOpacity: .9 }).addTo(map).bindTooltip("Honeypot");
+
+const dots = L.layerGroup().addTo(map);
+const arcs = L.layerGroup().addTo(map);
+const seen = new Set();
+let firstLoad = true;
+
+const kind = e => e.source === "cowrie" ? (e.proto === "telnet" ? "telnet" : "ssh") : e.source === "firewall" ? "blocked" : "web";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const key = e => `${e.t}|${e.src}|${e.type}|${e.user ?? ""}|${e.cmd ?? ""}|${e.path ?? ""}`;
+
+function arcPoints(a, b, n = 40) {
+  const pts = [], [la1, lo1] = a, [la2, lo2] = b, dist = Math.hypot(la2 - la1, lo2 - lo1);
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, lift = Math.sin(Math.PI * t) * dist * 0.18;
+    pts.push([la1 + (la2 - la1) * t + lift, lo1 + (lo2 - lo1) * t]);
+  }
+  return pts;
+}
+
+function fire(e) {
+  const c = COLORS[kind(e)], from = [e.lat, e.lon], pts = arcPoints(from, TARGET);
+  const line = L.polyline([], { color: c, weight: 1.6, opacity: .9 }).addTo(arcs);
+  let i = 0;
+  const step = () => {
+    line.addLatLng(pts[i++]);
+    if (i < pts.length) requestAnimationFrame(step);
+    else setTimeout(() => arcs.removeLayer(line), 1200);
+  };
+  step();
+  const flash = L.circleMarker(from, { radius: 10, color: c, weight: 1, fillOpacity: .35 }).addTo(arcs);
+  setTimeout(() => arcs.removeLayer(flash), 1500);
+}
+
+function describe(e) {
+  if (e.type === "login-failed" || e.type === "login-success") return `login ${esc(e.user)} / ${esc(e.pass)}${e.type === "login-success" ? " ✔" : ""}`;
+  if (e.type === "command") return `$ ${esc(e.cmd)}`;
+  if (e.type === "connect") return `connect :${esc(e.port)}`;
+  if (e.type === "blocked") return `blocked ${esc(e.proto)}:${esc(e.port ?? "?")}`;
+  if (e.type === "web-probe") return `${esc(e.method)} ${esc(e.path)}`;
+  return esc(e.type);
+}
+
+function addFeedLine(e) {
+  const feed = document.getElementById("feed"), d = document.createElement("div");
+  const t = new Date(e.t).toLocaleTimeString();
+  d.innerHTML = `<span class="tag" style="color:${COLORS[kind(e)]}">${kind(e)}</span>${t} ${esc(e.cc)} ${esc(e.src)} — ${describe(e)}`;
+  feed.prepend(d);
+  while (feed.childElementCount > 150) feed.lastChild.remove();
+}
+
+function bars(el, items, fmt = v => esc(v)) {
+  const max = Math.max(1, ...items.map(i => i.count));
+  document.getElementById(el).innerHTML = items.length ? items.map(i =>
+    `<div class="bar" style="--w:${(i.count / max * 100).toFixed(1)}%"><span>${fmt(i.value)}</span><span>${i.count}</span></div>`).join("")
+    : '<div style="color:var(--dim)">no data yet</div>';
+}
+
+function render(feed) {
+  const s = feed.stats;
+  document.getElementById("k-total").textContent = s.total.toLocaleString();
+  document.getElementById("k-src").textContent = s.unique_sources.toLocaleString();
+  document.getElementById("k-cc").textContent = new Set(feed.events.map(e => e.cc)).size;
+  document.getElementById("k-login").textContent = ((s.by_type["login-failed"] || 0) + (s.by_type["login-success"] || 0)).toLocaleString();
+  document.getElementById("updated").textContent = "live · updated " + new Date(feed.generated).toLocaleTimeString();
+  bars("t-countries", s.top_countries);
+  bars("t-ports", s.top_ports);
+  bars("t-users", s.top_usernames, v => `<code>${esc(v)}</code>`);
+  bars("t-pass", s.top_passwords, v => `<code>${esc(v)}</code>`);
+  bars("t-cmds", s.top_commands, v => `<code>${esc(v)}</code>`);
+
+  dots.clearLayers();
+  const byLoc = new Map();
+  for (const e of feed.events) {
+    const k = `${e.lat},${e.lon}`, cur = byLoc.get(k) || { e, n: 0 };
+    cur.n++; byLoc.set(k, cur);
+  }
+  for (const { e, n } of byLoc.values()) {
+    L.circleMarker([e.lat, e.lon], { radius: Math.min(3 + Math.log2(n) * 2, 14), color: COLORS[kind(e)], weight: 1, fillOpacity: .45 })
+      .bindTooltip(`${esc(e.city || "")} ${esc(e.country)} — ${n} event${n > 1 ? "s" : ""}`).addTo(dots);
+  }
+
+  const fresh = feed.events.filter(e => !seen.has(key(e)));
+  fresh.forEach(e => seen.add(key(e)));
+  // first load: replay the most recent 40 so the map looks alive immediately; afterwards, play
+  // new events spread across the poll interval so it reads as a continuous stream.
+  const play = (firstLoad ? fresh.slice(0, 40) : fresh).reverse();
+  firstLoad = false;
+  const gap = play.length ? Math.min(1500, POLL_MS / play.length) : 0;
+  play.forEach((e, i) => setTimeout(() => { fire(e); addFeedLine(e); }, i * gap));
+}
+
+async function poll() {
+  try {
+    const r = await fetch("feed.json", { cache: "no-store" });
+    if (r.ok) render(await r.json());
+  } catch (err) {
+    document.getElementById("updated").textContent = "reconnecting…";
+  }
+}
+poll();
+setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>

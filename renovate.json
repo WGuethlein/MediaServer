@@ -45,7 +45,9 @@
         "lscr.io/linuxserver/prowlarr",
         "lscr.io/linuxserver/bazarr",
         "ghcr.io/seerr-team/seerr",
-        "grafana/alloy"
+        "grafana/alloy",
+        "python",
+        "nginxinc/nginx-unprivileged"
       ],
       "matchUpdateTypes": [
         "minor",

@@ -23,6 +23,8 @@ services:
       - /etc/machine-id:/etc/machine-id:ro
       - ${DOCKERDIR}/logs/traefik:/logs/traefik:ro
       - /opt/AdGuardHome/data:/adguard:ro
+      - ${DOCKERDIR}/appdata/geoip:/geoip:ro                 # DB-IP City Lite (~/bin/geoip-update, monthly cron)
+      - ${DOCKERDIR}/appdata/cowrie/var/log/cowrie:/cowrie:ro  # honeypot event log
     environment:
       TZ: ${TZ}
     logging:

@@ -1,0 +1,44 @@
+# Cowrie honeypot — fake SSH/Telnet server. Added 2026-10-11. Docs: HomeAutomation/docs/honeypot.md
+# Router forwards WAN 22 → 2222 and WAN 23 → 2223 here. Isolated: own network, and the host firewall
+# (homelab-honeypot-egress.service) drops EVERYTHING it starts — it can only answer inbound connections,
+# never reach the LAN, the host, other containers or the internet. Events → Alloy → Loki → attack map.
+services:
+  cowrie:
+    container_name: cowrie
+    image: cowrie/cowrie:3.0.15
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 128
+    networks:
+      honeypot:
+        ipv4_address: 192.168.92.10
+    ports:
+      - "2222:2222"     # SSH honeypot  (WAN 22 → here)
+      - "2223:2223"     # Telnet honeypot (WAN 23 → here)
+    volumes:
+      - ${DOCKERDIR}/appdata/cowrie/var:/cowrie/cowrie-git/var   # cowrie.json event log, tty recordings
+      - ${DOCKERDIR}/appdata/cowrie/etc:/cowrie/cowrie-git/etc:ro
+    tmpfs:
+      - /tmp:size=16m
+    environment:
+      COWRIE_HONEYPOT_HOSTNAME: nas-backup01
+      COWRIE_HONEYPOT_TIMEZONE: UTC
+      COWRIE_TELNET_ENABLED: "yes"
+      COWRIE_HONEYPOT_DOWNLOAD_LIMIT_SIZE: "1048576"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  honeypot:
+    name: honeypot
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.92.0/24
+          gateway: 192.168.92.1
+
