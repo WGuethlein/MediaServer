@@ -44,7 +44,8 @@
         "lscr.io/linuxserver/lidarr",
         "lscr.io/linuxserver/prowlarr",
         "lscr.io/linuxserver/bazarr",
-        "ghcr.io/seerr-team/seerr"
+        "ghcr.io/seerr-team/seerr",
+        "grafana/alloy"
       ],
       "matchUpdateTypes": [
         "minor",

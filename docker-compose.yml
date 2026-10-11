@@ -119,6 +119,7 @@ include:
   - compose/audiobookshelf.yml
   - compose/listenarr.yml
   - compose/homepage.yml
+  - compose/alloy.yml        # log shipper → Loki on wyatt-mon (2026-10-11)
 
   # --- OPS / OBSERVABILITY ---
 #  - compose/diun.yml   # retired 2026-10-11: Renovate (self-hosted) replaces it; config kept in appdata/diun

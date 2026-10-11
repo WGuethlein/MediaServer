@@ -1,0 +1,129 @@
+// Alloy on wyatt-serv1 — ships logs to Loki on wyatt-mon (192.168.1.73:3100). 2026-10-11.
+// Sources: systemd journal, every container's stdout/stderr (via socket-proxy, read-only),
+// Traefik access log, AdGuard replica query log.
+// If wyatt-mon is down, Alloy buffers in its WAL (/var/lib/alloy/data) and retries.
+
+logging {
+  level = "warn"
+}
+
+loki.write "mon" {
+  endpoint {
+    url = "http://192.168.1.73:3100/loki/api/v1/push"
+  }
+}
+
+// ---------- systemd journal (sshd, sudo, kernel, docker, our homelab-* units) ----------
+loki.relabel "journal" {
+  forward_to = []
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+  rule {
+    source_labels = ["__journal_syslog_identifier"]
+    target_label  = "app"
+  }
+  rule {
+    source_labels = ["__journal_priority_keyword"]
+    target_label  = "level"
+  }
+}
+
+loki.source.journal "host" {
+  path          = "/var/log/journal"
+  max_age       = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  labels        = { host = "wyatt-serv1", job = "journal" }
+  forward_to    = [loki.write.mon.receiver]
+}
+
+// ---------- container logs ----------
+discovery.docker "containers" {
+  host             = "tcp://socket-proxy:2375"
+  refresh_interval = "30s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+}
+
+loki.source.docker "containers" {
+  host             = "tcp://socket-proxy:2375"
+  targets          = discovery.docker.containers.targets
+  relabel_rules    = discovery.relabel.containers.rules
+  labels           = { host = "wyatt-serv1", job = "docker" }
+  refresh_interval = "30s"
+  forward_to       = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  // strip terminal colour codes (tinyauth, *arr, etc.) so lines are searchable
+  stage.replace {
+    expression = "(\\x1b\\[[0-9;]*m)"
+    replace    = ""
+  }
+  forward_to = [loki.write.mon.receiver]
+}
+
+// ---------- Traefik access log (common log format + router + duration) ----------
+local.file_match "traefik" {
+  path_targets = [{ "__path__" = "/logs/traefik/access.log", host = "wyatt-serv1", job = "traefik" }]
+}
+
+loki.source.file "traefik" {
+  targets    = local.file_match.traefik.targets
+  tail_from_end = true
+  forward_to = [loki.process.traefik.receiver]
+}
+
+loki.process "traefik" {
+  stage.regex {
+    expression = "\\[(?P<ts>[^\\]]+)\\]"
+  }
+  stage.timestamp {
+    source = "ts"
+    format = "02/Jan/2006:15:04:05 -0700"
+  }
+  stage.label_drop {
+    values = ["filename"]
+  }
+  forward_to = [loki.write.mon.receiver]
+}
+
+// ---------- AdGuard Home replica query log ----------
+local.file_match "adguard" {
+  path_targets = [{ "__path__" = "/adguard/querylog.json", host = "wyatt-serv1", job = "adguard" }]
+}
+
+loki.source.file "adguard" {
+  targets    = local.file_match.adguard.targets
+  forward_to = [loki.process.adguard.receiver]
+}
+
+loki.process "adguard" {
+  stage.json {
+    expressions = { ts = "T" }
+  }
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339Nano"
+  }
+  stage.label_drop {
+    values = ["filename"]
+  }
+  forward_to = [loki.write.mon.receiver]
+}

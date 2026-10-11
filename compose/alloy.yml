@@ -1,0 +1,30 @@
+# Alloy — log shipper → Loki on wyatt-mon (192.168.1.73:3100). Added 2026-10-11.
+# Reads: systemd journal, all container logs (socket-proxy, read-only API), Traefik access log,
+# AdGuard replica query log. Config: alloy/config.alloy (tracked). Docs: HomeAutomation/docs/logging.md
+services:
+  alloy:
+    container_name: alloy
+    image: grafana/alloy:v1.19.2
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default          # egress to wyatt-mon
+      - socket_proxy     # container discovery + logs (GET only)
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345   # not published; debug UI via `docker exec`
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ${DOCKERDIR}/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ${DOCKERDIR}/appdata/alloy:/var/lib/alloy/data        # positions + WAL (survives wyatt-mon outages)
+      - /var/log/journal:/var/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - ${DOCKERDIR}/logs/traefik:/logs/traefik:ro
+      - /opt/AdGuardHome/data:/adguard:ro
+    environment:
+      TZ: ${TZ}
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
