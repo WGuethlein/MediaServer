@@ -7,6 +7,7 @@
 <meta name="robots" content="noindex,nofollow">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <style>
   :root { --bg:#070b12; --panel:#0e1522; --line:#1d2a3d; --text:#d7e2f0; --dim:#7f8ea3;
           --ssh:#ff4d6d; --telnet:#ff9f1c; --blocked:#4cc9f0; --web:#b388ff; --ok:#2ee59d; }
@@ -76,11 +77,17 @@ const TARGET = [39.83, -98.58];
 const POLL_MS = 30000;
 const COLORS = { ssh: "#ff4d6d", telnet: "#ff9f1c", blocked: "#4cc9f0", web: "#b388ff" };
 
-const map = L.map("map", { worldCopyJump: true, zoomControl: false, attributionControl: true }).setView([25, 0], 2);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
-  maxZoom: 8, subdomains: "abcd",
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> · IP geolocation <a href="https://db-ip.com">DB-IP</a>'
-}).addTo(map);
+const map = L.map("map", { worldCopyJump: true, zoomControl: false, attributionControl: true, minZoom: 2, maxZoom: 7 }).setView([25, 0], 2);
+// Vector world map (Natural Earth via world-atlas) — no tile server, no API key.
+map.attributionControl.addAttribution('Map <a href="https://www.naturalearthdata.com/">Natural Earth</a> · IP geolocation <a href="https://db-ip.com">DB-IP</a>');
+fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json")
+  .then(r => r.json())
+  .then(topo => {
+    L.geoJSON(topojson.feature(topo, topo.objects.countries), {
+      style: { color: "#24344d", weight: 0.6, fillColor: "#101a2a", fillOpacity: 1 },
+      interactive: false
+    }).addTo(map).bringToBack();
+  });
 L.circleMarker(TARGET, { radius: 6, color: "#2ee59d", weight: 2, fillOpacity: .9 }).addTo(map).bindTooltip("Honeypot");
 
 const dots = L.layerGroup().addTo(map);
