@@ -130,24 +130,43 @@ function greatCircle(a, b, n = 96) {
   return pts;
 }
 
+// Animation loop. Never allowed to die: errors are caught and counted, and map data is pushed
+// at most ~30x/s and only while something is moving (pushing GeoJSON every frame can back up
+// MapLibre's worker over time).
+let lastPush = 0, lastPulse = 0, loopErrors = 0, idlePushed = false;
 function frame(now) {
-  const lines = [], heads = [];
-  for (let i = arcs.length - 1; i >= 0; i--) {
-    const a = arcs[i], t = (now - a.start) / a.dur;
-    if (t >= 1.6) { arcs.splice(i, 1); continue; }
-    const grow = Math.min(t, 1), fade = t <= 1 ? 1 : 1 - (t - 1) / 0.6;
-    const n = Math.max(2, Math.ceil(grow * (a.coords.length - 1)) + 1);
-    const tailStart = Math.max(0, n - 40);
-    lines.push({ type: "Feature", properties: { color: a.color, op: 0.9 * fade },
-                 geometry: { type: "LineString", coordinates: a.coords.slice(tailStart, n) } });
-    if (t <= 1) heads.push({ type: "Feature", properties: { color: a.color }, geometry: { type: "Point", coordinates: a.coords[n - 1] } });
-    else heads.push({ type: "Feature", properties: { color: a.color, impact: 1 - (t - 1) / 0.6 }, geometry: { type: "Point", coordinates: TARGET } });
+  try {
+    if (now - lastPush >= 33) {
+      lastPush = now;
+      const lines = [], heads = [];
+      for (let i = arcs.length - 1; i >= 0; i--) {
+        const a = arcs[i], t = (now - a.start) / a.dur;
+        if (t >= 1.6 || t < 0) { arcs.splice(i, 1); continue; }
+        const grow = Math.min(t, 1), fade = t <= 1 ? 1 : 1 - (t - 1) / 0.6;
+        const n = Math.max(2, Math.ceil(grow * (a.coords.length - 1)) + 1);
+        lines.push({ type: "Feature", properties: { color: a.color, op: 0.9 * fade },
+                     geometry: { type: "LineString", coordinates: a.coords.slice(Math.max(0, n - 40), n) } });
+        heads.push(t <= 1
+          ? { type: "Feature", properties: { color: a.color }, geometry: { type: "Point", coordinates: a.coords[n - 1] } }
+          : { type: "Feature", properties: { color: a.color, impact: 1 - (t - 1) / 0.6 }, geometry: { type: "Point", coordinates: TARGET } });
+      }
+      if (lines.length || !idlePushed) {          // when idle, push one empty update then stop
+        map.getSource("arcs").setData({ type: "FeatureCollection", features: lines });
+        map.getSource("heads").setData({ type: "FeatureCollection", features: heads });
+        idlePushed = lines.length === 0;
+      }
+    }
+    if (now - lastPulse >= 50) {
+      lastPulse = now;
+      const t = (now % 2000) / 2000;
+      map.setPaintProperty("target-pulse", "circle-radius", 6 + t * 22);
+      map.setPaintProperty("target-pulse", "circle-opacity", 0.5 * (1 - t));
+    }
+  } catch (err) {
+    loopErrors++;
+    console.error("attack map frame error", err);
+    arcs.length = 0;                             // drop whatever broke it and carry on
   }
-  const t = (now % 2000) / 2000;
-  map.getSource("arcs").setData({ type: "FeatureCollection", features: lines });
-  map.getSource("heads").setData({ type: "FeatureCollection", features: heads });
-  map.setPaintProperty("target-pulse", "circle-radius", 6 + t * 22);
-  map.setPaintProperty("target-pulse", "circle-opacity", 0.5 * (1 - t));
   requestAnimationFrame(frame);
 }
 
@@ -196,6 +215,13 @@ map.on("load", () => {
   if (lastPoints) map.getSource("points").setData(lastPoints);
   requestAnimationFrame(frame);
 });
+// self-heal for a page left running on a screen: reload if no successful poll for 5 minutes,
+// and once every 6 hours regardless (keeps memory/tiles fresh).
+let lastOk = Date.now();
+setInterval(() => {
+  if (Date.now() - lastOk > 5 * 60000 || performance.now() > 6 * 3600000) location.reload();
+}, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) arcs.length = 0; });
 // the sidebar/feed must not wait for the map (map "load" needs a visible, rendering tab)
 poll();
 setInterval(poll, POLL_MS);
@@ -273,13 +299,13 @@ function render(feed) {
   const play = (firstLoad ? fresh.slice(0, 40) : fresh).reverse();
   firstLoad = false;
   const gap = play.length ? Math.min(1500, POLL_MS / play.length) : 0;
-  play.forEach((e, i) => setTimeout(() => { fire(e); addFeedLine(e); }, i * gap));
+  play.forEach((e, i) => setTimeout(() => { if (!document.hidden) fire(e); addFeedLine(e); }, i * gap));
 }
 
 async function poll() {
   try {
     const r = await fetch("feed.json", { cache: "no-store" });
-    if (r.ok) render(await r.json());
+    if (r.ok) { render(await r.json()); lastOk = Date.now(); }
   } catch (err) {
     document.getElementById("updated").textContent = "reconnecting…";
   }
