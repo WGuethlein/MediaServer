@@ -1,0 +1,58 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Selective container updates (2026-10-11). Tiers: auto (patch/minor merge after 3 days, applied by the server right after the nightly backup), notify (PR, you merge), manual (dashboard checkbox only). Majors are never automatic. Design: HomeAutomation/research/07-selective-auto-updates.md",
+  "extends": ["config:recommended", ":dependencyDashboard", ":semanticCommitsDisabled"],
+  "timezone": "America/Chicago",
+  "enabledManagers": ["docker-compose"],
+  "docker-compose": { "fileMatch": ["(^|/)compose/[^/]+\\.ya?ml$", "(^|/)docker-compose\\.ya?ml$"] },
+  "prHourlyLimit": 4,
+  "prConcurrentLimit": 10,
+  "minimumReleaseAge": "3 days",
+  "labels": ["renovate"],
+  "packageRules": [
+    {
+      "description": "Default = NOTIFY tier: open a PR, never merge automatically",
+      "matchManagers": ["docker-compose"],
+      "automerge": false
+    },
+    {
+      "description": "AUTO tier: stateless/low-risk apps — patch+minor merge straight to main after 3 days",
+      "matchPackageNames": [
+        "ghcr.io/flaresolverr/flaresolverr",
+        "favonia/cloudflare-ddns",
+        "ghcr.io/gethomepage/homepage",
+        "golift/unpackerr",
+        "markbeep/audiobookrequest",
+        "ghcr.io/crazy-max/diun"
+      ],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true,
+      "automergeType": "branch",
+      "ignoreTests": true
+    },
+    {
+      "description": "MANUAL tier: access/security-critical or stateful — only on explicit approval in the Dependency Dashboard",
+      "matchPackageNames": [
+        "traefik",
+        "ghcr.io/tinyauthapp/tinyauth",
+        "crowdsecurity/crowdsec",
+        "tecnativa/docker-socket-proxy",
+        "qmcgaw/gluetun",
+        "itzg/minecraft-server"
+      ],
+      "dependencyDashboardApproval": true,
+      "automerge": false
+    },
+    {
+      "description": "Majors are never automatic, for any tier",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "dependencyDashboardApproval": true
+    },
+    {
+      "description": "linuxserver.io images: their tags carry -lsNNN build suffixes; treat them as versions",
+      "matchPackageNames": ["/^lscr\\.io\\/linuxserver\\//"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(\\.(?<build>\\d+))?(-ls(?<revision>\\d+))?$"
+    }
+  ]
+}
