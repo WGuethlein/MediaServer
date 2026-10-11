@@ -121,7 +121,7 @@ include:
   - compose/homepage.yml
   - compose/alloy.yml        # log shipper → Loki on wyatt-mon (2026-10-11)
   - compose/attackfeed.yml   # public scrubbed attack feed + live map (2026-10-11)
-#  - compose/honeypot.yml    # Cowrie — enable only with homelab-honeypot-egress.service active
+  - compose/honeypot.yml     # Cowrie honeypot — isolated by homelab-honeypot-egress.service (2026-10-11)
 
   # --- OPS / OBSERVABILITY ---
 #  - compose/diun.yml   # retired 2026-10-11: Renovate (self-hosted) replaces it; config kept in appdata/diun
