@@ -1,37 +1,62 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Selective container updates (2026-10-11). Tiers: auto (patch/minor merge after 3 days, applied by the server right after the nightly backup), notify (PR, you merge), manual (dashboard checkbox only). Majors are never automatic. Design: HomeAutomation/research/07-selective-auto-updates.md",
-  "extends": ["config:recommended", ":dependencyDashboard", ":semanticCommitsDisabled"],
+  "description": "Selective container updates (2026-10-11). Tiers: auto (patch/minor merge after 3 days, applied by the server right after the nightly backup), notify (PR; owner approves via Claude / weekly Discord digest), manual (dashboard checkbox only). Majors are never automatic. Design: HomeAutomation/research/07-selective-auto-updates.md",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommitsDisabled"
+  ],
   "timezone": "America/Chicago",
-  "enabledManagers": ["docker-compose"],
-  "docker-compose": { "fileMatch": ["(^|/)compose/[^/]+\\.ya?ml$", "(^|/)docker-compose\\.ya?ml$"] },
+  "enabledManagers": [
+    "docker-compose"
+  ],
+  "docker-compose": {
+    "managerFilePatterns": [
+      "/(^|/)compose/[^/]+\\.ya?ml$/",
+      "/(^|/)docker-compose\\.ya?ml$/"
+    ]
+  },
   "prHourlyLimit": 4,
   "prConcurrentLimit": 10,
   "minimumReleaseAge": "3 days",
-  "labels": ["renovate"],
+  "labels": [
+    "renovate"
+  ],
   "packageRules": [
     {
       "description": "Default = NOTIFY tier: open a PR, never merge automatically",
-      "matchManagers": ["docker-compose"],
+      "matchManagers": [
+        "docker-compose"
+      ],
       "automerge": false
     },
     {
-      "description": "AUTO tier: stateless/low-risk apps — patch+minor merge straight to main after 3 days",
+      "description": "AUTO tier: patch+minor (and digest) merged to main after 3 days, applied after the nightly backup with health check + auto-rollback",
       "matchPackageNames": [
         "ghcr.io/flaresolverr/flaresolverr",
         "favonia/cloudflare-ddns",
         "ghcr.io/gethomepage/homepage",
         "golift/unpackerr",
         "markbeep/audiobookrequest",
-        "ghcr.io/crazy-max/diun"
+        "ghcr.io/crazy-max/diun",
+        "lscr.io/linuxserver/sonarr",
+        "lscr.io/linuxserver/radarr",
+        "lscr.io/linuxserver/lidarr",
+        "lscr.io/linuxserver/prowlarr",
+        "lscr.io/linuxserver/bazarr",
+        "ghcr.io/seerr-team/seerr"
       ],
-      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
       "automerge": true,
       "automergeType": "branch",
       "ignoreTests": true
     },
     {
-      "description": "MANUAL tier: access/security-critical or stateful — only on explicit approval in the Dependency Dashboard",
+      "description": "MANUAL tier: access/security-critical or stateful - only on explicit approval in the Dependency Dashboard",
       "matchPackageNames": [
         "traefik",
         "ghcr.io/tinyauthapp/tinyauth",
@@ -45,13 +70,17 @@
     },
     {
       "description": "Majors are never automatic, for any tier",
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "automerge": false,
       "dependencyDashboardApproval": true
     },
     {
       "description": "linuxserver.io images: their tags carry -lsNNN build suffixes; treat them as versions",
-      "matchPackageNames": ["/^lscr\\.io\\/linuxserver\\//"],
+      "matchPackageNames": [
+        "/^lscr\\.io\\/linuxserver\\//"
+      ],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(\\.(?<build>\\d+))?(-ls(?<revision>\\d+))?$"
     }
   ]
