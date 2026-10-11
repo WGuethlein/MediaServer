@@ -18,11 +18,9 @@ services:
       - target: 80
         published: 80
         protocol: tcp
-        mode: host
       - target: 443
         published: 443
         protocol: tcp
-        mode: host
     volumes:
       - ${DOCKERDIR}/traefik/rules:/rules:ro
       - ${DOCKERDIR}/traefik/acme/acme.json:/acme.json
