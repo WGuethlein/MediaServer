@@ -26,3 +26,6 @@ appdata/homepage/services.yaml
 
 # dated backups (e.g. .env.bak.2026-10-11) must never be committed
 *.bak.*
+
+# local rollback pins written by homelab-autoupdate (never commit)
+docker-compose.override.yml
