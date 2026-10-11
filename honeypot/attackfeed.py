@@ -31,12 +31,15 @@ SCRUB_WORDS = [w for w in os.environ.get("SCRUB_WORDS", "geet.dev,wyatt,guethlei
 
 QUERIES = {
     "cowrie": '{job="cowrie", eventid=~"cowrie.session.connect|cowrie.login.failed|cowrie.login.success|cowrie.command.input"}',
-    "firewall": '{job="unifi"} !~ "UNIFIcategory=Audit" |~ "src=[0-9]"',
+    # only the gateway's default block rules on the internet side (ulogd: IN=eth1 ... SRC= DPT= PROTO=);
+    # never port-forward DNAT/MASQUERADE lines (those are allowed traffic, possibly family using Plex)
+    "firewall": '{job="unifi"} |= "Block All Traffic" |~ "WAN_(LOCAL|IN)" |~ "IN=eth"',
     "web": '{job="traefik"} | pattern `<_> - <_> [<_>] "<_> <_> <_>" <_> <_> "<_>" "<_>" <_> "<router>" "<_>" <_>` | router="-"',
 }
 TRAEFIK_RE = re.compile(r'^(\S+) - \S+ \[[^\]]+\] "(\S+) (\S+) [^"]*" (\d{3})')
 CEF_RE = re.compile(r"CEF: \d+\|[^|]*\|[^|]*\|[^|]*\|[^|]*\|([^|]*)\|")
-KV_RE = re.compile(r"(?:^|\s)(src|spt|dst|dpt|proto|UNIFIcategory)=(\S+)")
+KV_RE = re.compile(r"(?:^|\s)(src|spt|dst|dpt|proto|UNIFIcategory)=(\S+)", re.I)
+DESCR_RE = re.compile(r'DESCR="([^"]*)"')
 
 
 def log(*a):
@@ -124,8 +127,8 @@ def parse(source, line, labels, home_ip):
             e["cmd"] = scrub(j.get("input"), home_ip)
         return e
     if source == "firewall":
-        kv = dict(KV_RE.findall(line))
-        m = CEF_RE.search(line)
+        kv = {k.lower(): v for k, v in KV_RE.findall(line)}
+        m = CEF_RE.search(line) or DESCR_RE.search(line)
         port = kv.get("dpt")
         return {"type": "blocked", "src": kv.get("src"), "proto": (kv.get("proto") or "").lower(),
                 "port": int(port) if port and port.isdigit() else None,
