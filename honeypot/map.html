@@ -65,6 +65,7 @@
     <div class="mapbtns">
       <button id="btn-globe" aria-pressed="false" title="Toggle globe / flat map">Globe</button>
       <button id="btn-home" title="Back to the default view">Reset view</button>
+      <button id="btn-hist" aria-pressed="true" title="Replay recent history as faint arcs while waiting for live attacks">History</button>
     </div>
   </div>
   <aside>
@@ -86,7 +87,13 @@
 // Target = Columbus, Ohio ([lng, lat] — MapLibre order).
 const TARGET = [-82.999, 39.961];
 const HOME_VIEW = { center: [-60, 30], zoom: 1.6 };
-const POLL_MS = 30000;
+const POLL_MS = 15000;
+// Live events play at their real time + LAG (covers Loki ingest + 20 s feed rebuild + 15 s poll),
+// so they come out as a steady stream instead of a burst per poll.
+const LAG_MS = 75000;
+// Ambient replay: when nothing live is playing, re-play a random real event from the last 24 h as a
+// faint arc (no impact flash, no feed line) so a wall display never looks dead.
+const AMBIENT_EVERY_MS = 1100;
 const COLORS = { ssh: "#ff4d6d", telnet: "#ff9f1c", blocked: "#4cc9f0", web: "#b388ff" };
 
 const kind = e => e.source === "cowrie" ? (e.proto === "telnet" ? "telnet" : "ssh") : e.source === "firewall" ? "blocked" : "web";
@@ -144,15 +151,16 @@ function frame(now) {
         if (t >= 1.6 || t < 0) { arcs.splice(i, 1); continue; }
         const grow = Math.min(t, 1), fade = t <= 1 ? 1 : 1 - (t - 1) / 0.6;
         const n = Math.max(2, Math.ceil(grow * (a.coords.length - 1)) + 1);
-        lines.push({ type: "Feature", properties: { color: a.color, op: 0.9 * fade },
+        lines.push({ type: "Feature", properties: { color: a.color, op: (a.ambient ? 0.35 : 0.95) * fade, w: a.ambient ? 1.2 : 2.4 },
                      geometry: { type: "LineString", coordinates: a.coords.slice(Math.max(0, n - 40), n) } });
         heads.push(t <= 1
           ? { type: "Feature", properties: { color: a.color }, geometry: { type: "Point", coordinates: a.coords[n - 1] } }
+          : a.ambient ? null
           : { type: "Feature", properties: { color: a.color, impact: 1 - (t - 1) / 0.6 }, geometry: { type: "Point", coordinates: TARGET } });
       }
       if (lines.length || !idlePushed) {          // when idle, push one empty update then stop
         map.getSource("arcs").setData({ type: "FeatureCollection", features: lines });
-        map.getSource("heads").setData({ type: "FeatureCollection", features: heads });
+        map.getSource("heads").setData({ type: "FeatureCollection", features: heads.filter(Boolean) });
         idlePushed = lines.length === 0;
       }
     }
@@ -170,10 +178,18 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function fire(e) {
-  if (!mapReady) { map.once("load", () => setTimeout(() => fire(e), 50)); return; }   // replay once the map is up
-  arcs.push({ coords: greatCircle([e.lon, e.lat], TARGET), color: COLORS[kind(e)], start: performance.now(), dur: 2200 });
+let lastLive = 0, history = [], historyOn = true;
+function fire(e, ambient = false) {
+  if (!mapReady || document.hidden) return;
+  if (!ambient) lastLive = performance.now();
+  arcs.push({ coords: greatCircle([e.lon, e.lat], TARGET), color: COLORS[kind(e)], start: performance.now(),
+              dur: ambient ? 2600 : 2200, ambient });
 }
+setInterval(() => {
+  if (!historyOn || !history.length || performance.now() - lastLive < AMBIENT_EVERY_MS) return;
+  // bias toward recent events: square of a uniform number picks the newest end more often
+  fire(history[Math.floor(Math.random() ** 2 * history.length)], true);
+}, AMBIENT_EVERY_MS);
 
 map.on("load", () => {
   // tone the basemap down a little so the attack layers stand out
@@ -192,7 +208,7 @@ map.on("load", () => {
     "circle-color": ["get", "color"], "circle-opacity": 0.85, "circle-stroke-color": "#070b12", "circle-stroke-width": 1,
     "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2.5, ["*", 1.2, ["ln", ["get", "n"]]]], 8, ["+", 5, ["*", 2, ["ln", ["get", "n"]]]]] } });
   map.addLayer({ id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: {
-    "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": 2, "line-blur": 0.5 } });
+    "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": ["get", "w"], "line-blur": 0.5 } });
   map.addLayer({ id: "heads", type: "circle", source: "heads", paint: {
     "circle-color": ["get", "color"], "circle-blur": 0.4,
     "circle-radius": ["case", ["has", "impact"], ["-", 18, ["*", 14, ["get", "impact"]]], 3.5],
@@ -233,6 +249,10 @@ document.getElementById("btn-globe").onclick = ev => {
   map.easeTo(on ? { center: TARGET, zoom: 1.4 } : HOME_VIEW);
 };
 document.getElementById("btn-home").onclick = () => map.easeTo(HOME_VIEW);
+document.getElementById("btn-hist").onclick = ev => {
+  historyOn = ev.currentTarget.getAttribute("aria-pressed") !== "true";
+  ev.currentTarget.setAttribute("aria-pressed", String(historyOn));
+};
 
 // ---------------------------------------------------------------- sidebar
 function describe(e) {
@@ -292,14 +312,24 @@ function render(feed) {
   lastPoints = { type: "FeatureCollection", features };
   if (mapReady) map.getSource("points").setData(lastPoints);
 
+  history = feed.events;   // newest first
   const fresh = feed.events.filter(e => !seen.has(key(e)));
   fresh.forEach(e => seen.add(key(e)));
-  // first load: replay the most recent 40 so the map looks alive immediately; afterwards, play
-  // new events spread across the poll interval so it reads as a continuous stream.
-  const play = (firstLoad ? fresh.slice(0, 40) : fresh).reverse();
+  // Schedule each new event at its real time + LAG. On first load that means events from the last
+  // LAG window play out live; older ones only show up in the feed list / ambient replay.
+  const now = Date.now();
+  if (firstLoad) {
+    fresh.filter(e => now - Date.parse(e.t) > LAG_MS).slice(0, 25).reverse().forEach(addFeedLine);
+  }
+  let prevAt = 0;
+  // after the first load every new event plays live; late arrivals (batched sources) play ASAP
+  (firstLoad ? fresh.filter(e => now - Date.parse(e.t) <= LAG_MS) : fresh).reverse().forEach(e => {
+    let at = Date.parse(e.t) + LAG_MS - now;
+    at = Math.max(at, prevAt + 250, 0);          // never two in the same instant
+    prevAt = at;
+    setTimeout(() => { fire(e); addFeedLine(e); }, at);
+  });
   firstLoad = false;
-  const gap = play.length ? Math.min(1500, POLL_MS / play.length) : 0;
-  play.forEach((e, i) => setTimeout(() => { if (!document.hidden) fire(e); addFeedLine(e); }, i * gap));
 }
 
 async function poll() {

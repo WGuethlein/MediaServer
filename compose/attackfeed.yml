@@ -23,6 +23,7 @@ services:
       - attackfeed_token
     environment:
       LOKI_URL: http://192.168.1.73:3100
+      INTERVAL: "20"            # seconds between feed rebuilds (page polls every 15 s)
       TOKEN_FILE: /run/secrets/attackfeed_token
       HOME_WAN_IP_SCRUB: "1"
     logging:
