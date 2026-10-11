@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live Attack Map</title>
 <meta name="robots" content="noindex,nofollow">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <style>
   :root { --bg:#070b12; --panel:#0e1522; --line:#1d2a3d; --text:#d7e2f0; --dim:#7f8ea3;
           --ssh:#ff4d6d; --telnet:#ff9f1c; --blocked:#4cc9f0; --web:#b388ff; --ok:#2ee59d; }
@@ -23,7 +22,12 @@
   .kpi b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
   .kpi span { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
   main { display:grid; grid-template-columns:1fr 340px; height:calc(100% - 58px); }
-  #map { background:var(--bg); }
+  #mapwrap { position:relative; }
+  #map { position:absolute; inset:0; background:var(--bg); }
+  .mapbtns { position:absolute; top:10px; left:10px; z-index:2; display:flex; gap:6px; }
+  .mapbtns button { background:rgba(14,21,34,.85); color:var(--text); border:1px solid var(--line); border-radius:6px;
+                    padding:5px 10px; font:12px ui-sans-serif,system-ui,sans-serif; cursor:pointer; }
+  .mapbtns button[aria-pressed="true"] { border-color:var(--blocked); color:var(--blocked); }
   aside { border-left:1px solid var(--line); overflow:auto; padding:12px; display:flex; flex-direction:column; gap:14px; }
   .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
   .card h2 { font-size:11px; margin:0 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
@@ -37,10 +41,11 @@
   .tag { display:inline-block; min-width:62px; font-size:10px; text-transform:uppercase; }
   .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--dim); }
   .legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:-1px; }
-  .leaflet-container { background:var(--bg); }
-  .leaflet-control-attribution { background:rgba(7,11,18,.7)!important; color:var(--dim)!important; }
-  .leaflet-control-attribution a { color:var(--dim)!important; }
-  @media (max-width:800px){ main{grid-template-columns:1fr; grid-template-rows:55vh auto; height:auto} aside{border-left:0} }
+  .maplibregl-popup-content { background:var(--panel); color:var(--text); border:1px solid var(--line); padding:6px 10px; font-size:12px; }
+  .maplibregl-popup-tip { display:none; }
+  .maplibregl-ctrl-attrib { background:rgba(7,11,18,.7)!important; color:var(--dim)!important; }
+  .maplibregl-ctrl-attrib a { color:var(--dim)!important; }
+  @media (max-width:800px){ main{grid-template-columns:1fr; grid-template-rows:60vh auto; height:auto} aside{border-left:0} }
 </style>
 </head>
 <body>
@@ -55,7 +60,13 @@
   </div>
 </header>
 <main>
-  <div id="map"></div>
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div class="mapbtns">
+      <button id="btn-globe" aria-pressed="false" title="Toggle globe / flat map">Globe</button>
+      <button id="btn-home" title="Back to the default view">Reset view</button>
+    </div>
+  </div>
   <aside>
     <div class="card legend">
       <span><i style="background:var(--ssh)"></i>SSH honeypot</span>
@@ -72,58 +83,132 @@
   </aside>
 </main>
 <script>
-// Generic target (geographic centre of the contiguous US) — deliberately not the real location.
-const TARGET = [39.83, -98.58];
+// Target = Columbus, Ohio ([lng, lat] — MapLibre order).
+const TARGET = [-82.999, 39.961];
+const HOME_VIEW = { center: [-60, 30], zoom: 1.6 };
 const POLL_MS = 30000;
 const COLORS = { ssh: "#ff4d6d", telnet: "#ff9f1c", blocked: "#4cc9f0", web: "#b388ff" };
-
-const map = L.map("map", { worldCopyJump: true, zoomControl: false, attributionControl: true, minZoom: 2, maxZoom: 7 }).setView([25, 0], 2);
-// Vector world map (Natural Earth via world-atlas) — no tile server, no API key.
-map.attributionControl.addAttribution('Map <a href="https://www.naturalearthdata.com/">Natural Earth</a> · IP geolocation <a href="https://db-ip.com">DB-IP</a>');
-fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json")
-  .then(r => r.json())
-  .then(topo => {
-    const world = topojson.feature(topo, topo.objects.countries);
-    world.features = world.features.filter(f => f.id !== "010");   // Antarctica: edge artifact, no attackers
-    L.geoJSON(world, {
-      style: { color: "#2f4466", weight: 0.7, fillColor: "#16233a", fillOpacity: 1 },
-      interactive: false
-    }).addTo(map).bringToBack();
-  });
-L.circleMarker(TARGET, { radius: 6, color: "#2ee59d", weight: 2, fillOpacity: .9 }).addTo(map).bindTooltip("Honeypot");
-
-const dots = L.layerGroup().addTo(map);
-const arcs = L.layerGroup().addTo(map);
-const seen = new Set();
-let firstLoad = true;
 
 const kind = e => e.source === "cowrie" ? (e.proto === "telnet" ? "telnet" : "ssh") : e.source === "firewall" ? "blocked" : "web";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const key = e => `${e.t}|${e.src}|${e.type}|${e.user ?? ""}|${e.cmd ?? ""}|${e.path ?? ""}`;
 
-function arcPoints(a, b, n = 40) {
-  const pts = [], [la1, lo1] = a, [la2, lo2] = b, dist = Math.hypot(la2 - la1, lo2 - lo1);
+// ---------------------------------------------------------------- map
+// OpenFreeMap: free vector tiles, no API key, no registration (https://openfreemap.org).
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://tiles.openfreemap.org/styles/dark",
+  ...HOME_VIEW,
+  minZoom: 0.8,
+  maxZoom: 12,
+  attributionControl: { compact: true, customAttribution: 'IP geolocation <a href="https://db-ip.com">DB-IP</a>' },
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+
+const empty = () => ({ type: "FeatureCollection", features: [] });
+const arcs = [];            // active animations: {coords, color, start, dur}
+let animating = false;
+
+// Great-circle path from a to b ([lng,lat]), longitudes unwrapped so it never jumps at ±180°.
+function greatCircle(a, b, n = 96) {
+  const rad = Math.PI / 180, deg = 180 / Math.PI;
+  const [l1, p1, l2, p2] = [a[0] * rad, a[1] * rad, b[0] * rad, b[1] * rad];
+  const d = 2 * Math.asin(Math.sqrt(Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin((l2 - l1) / 2) ** 2));
+  if (d === 0) return [a, b];
+  const pts = [];
+  let prev = null;
   for (let i = 0; i <= n; i++) {
-    const t = i / n, lift = Math.sin(Math.PI * t) * dist * 0.18;
-    pts.push([la1 + (la2 - la1) * t + lift, lo1 + (lo2 - lo1) * t]);
+    const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(p1) * Math.cos(l1) + B * Math.cos(p2) * Math.cos(l2);
+    const y = A * Math.cos(p1) * Math.sin(l1) + B * Math.cos(p2) * Math.sin(l2);
+    const z = A * Math.sin(p1) + B * Math.sin(p2);
+    let lng = Math.atan2(y, x) * deg;
+    const lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * deg;
+    if (prev !== null) { while (lng - prev > 180) lng -= 360; while (lng - prev < -180) lng += 360; }
+    pts.push([lng, lat]); prev = lng;
   }
   return pts;
 }
 
-function fire(e) {
-  const c = COLORS[kind(e)], from = [e.lat, e.lon], pts = arcPoints(from, TARGET);
-  const line = L.polyline([], { color: c, weight: 1.6, opacity: .9 }).addTo(arcs);
-  let i = 0;
-  const step = () => {
-    line.addLatLng(pts[i++]);
-    if (i < pts.length) requestAnimationFrame(step);
-    else setTimeout(() => arcs.removeLayer(line), 1200);
-  };
-  step();
-  const flash = L.circleMarker(from, { radius: 10, color: c, weight: 1, fillOpacity: .35 }).addTo(arcs);
-  setTimeout(() => arcs.removeLayer(flash), 1500);
+function frame(now) {
+  const lines = [], heads = [];
+  for (let i = arcs.length - 1; i >= 0; i--) {
+    const a = arcs[i], t = (now - a.start) / a.dur;
+    if (t >= 1.6) { arcs.splice(i, 1); continue; }
+    const grow = Math.min(t, 1), fade = t <= 1 ? 1 : 1 - (t - 1) / 0.6;
+    const n = Math.max(2, Math.ceil(grow * (a.coords.length - 1)) + 1);
+    const tailStart = Math.max(0, n - 40);
+    lines.push({ type: "Feature", properties: { color: a.color, op: 0.9 * fade },
+                 geometry: { type: "LineString", coordinates: a.coords.slice(tailStart, n) } });
+    if (t <= 1) heads.push({ type: "Feature", properties: { color: a.color }, geometry: { type: "Point", coordinates: a.coords[n - 1] } });
+    else heads.push({ type: "Feature", properties: { color: a.color, impact: 1 - (t - 1) / 0.6 }, geometry: { type: "Point", coordinates: TARGET } });
+  }
+  const t = (now % 2000) / 2000;
+  map.getSource("arcs").setData({ type: "FeatureCollection", features: lines });
+  map.getSource("heads").setData({ type: "FeatureCollection", features: heads });
+  map.setPaintProperty("target-pulse", "circle-radius", 6 + t * 22);
+  map.setPaintProperty("target-pulse", "circle-opacity", 0.5 * (1 - t));
+  requestAnimationFrame(frame);
 }
 
+function fire(e) {
+  if (!mapReady) return;
+  arcs.push({ coords: greatCircle([e.lon, e.lat], TARGET), color: COLORS[kind(e)], start: performance.now(), dur: 2200 });
+}
+
+map.on("load", () => {
+  // tone the basemap down a little so the attack layers stand out
+  for (const l of map.getStyle().layers) {
+    if (l.type === "symbol" && /^place_(country|state|city)/.test(l.id) === false && /name/.test(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
+  }
+  map.addSource("points", { type: "geojson", data: empty() });
+  map.addSource("arcs", { type: "geojson", data: empty() });
+  map.addSource("heads", { type: "geojson", data: empty() });
+  map.addSource("target", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: TARGET } } });
+
+  map.addLayer({ id: "points-glow", type: "circle", source: "points", paint: {
+    "circle-color": ["get", "color"], "circle-opacity": 0.18, "circle-blur": 0.8,
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 6, ["*", 3, ["ln", ["get", "n"]]]], 8, ["+", 14, ["*", 5, ["ln", ["get", "n"]]]]] } });
+  map.addLayer({ id: "points", type: "circle", source: "points", paint: {
+    "circle-color": ["get", "color"], "circle-opacity": 0.85, "circle-stroke-color": "#070b12", "circle-stroke-width": 1,
+    "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2.5, ["*", 1.2, ["ln", ["get", "n"]]]], 8, ["+", 5, ["*", 2, ["ln", ["get", "n"]]]]] } });
+  map.addLayer({ id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: {
+    "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": 2, "line-blur": 0.5 } });
+  map.addLayer({ id: "heads", type: "circle", source: "heads", paint: {
+    "circle-color": ["get", "color"], "circle-blur": 0.4,
+    "circle-radius": ["case", ["has", "impact"], ["-", 18, ["*", 14, ["get", "impact"]]], 3.5],
+    "circle-opacity": ["case", ["has", "impact"], ["get", "impact"], 1] } });
+  map.addLayer({ id: "target-pulse", type: "circle", source: "target", paint: { "circle-color": "#2ee59d", "circle-radius": 8, "circle-opacity": 0.4 } });
+  map.addLayer({ id: "target", type: "circle", source: "target", paint: {
+    "circle-color": "#2ee59d", "circle-radius": 5, "circle-stroke-color": "#070b12", "circle-stroke-width": 1.5 } });
+
+  const pop = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+  map.on("mousemove", "points", ev => {
+    const p = ev.features[0].properties;
+    map.getCanvas().style.cursor = "pointer";
+    pop.setLngLat(ev.lngLat).setHTML(`<b>${esc(p.city)}</b> ${esc(p.country)}<br>${p.n} event${p.n > 1 ? "s" : ""} · ${esc(p.kinds)}`).addTo(map);
+  });
+  map.on("mouseleave", "points", () => { map.getCanvas().style.cursor = ""; pop.remove(); });
+  map.on("mousemove", "target", ev => pop.setLngLat(ev.lngLat).setHTML("<b>Honeypot</b> Columbus, Ohio").addTo(map));
+  map.on("mouseleave", "target", () => pop.remove());
+
+  mapReady = true;
+  if (lastPoints) map.getSource("points").setData(lastPoints);
+  requestAnimationFrame(frame);
+});
+// the sidebar/feed must not wait for the map (map "load" needs a visible, rendering tab)
+poll();
+setInterval(poll, POLL_MS);
+
+document.getElementById("btn-globe").onclick = ev => {
+  const on = ev.currentTarget.getAttribute("aria-pressed") !== "true";
+  ev.currentTarget.setAttribute("aria-pressed", String(on));
+  map.setProjection({ type: on ? "globe" : "mercator" });
+  map.easeTo(on ? { center: TARGET, zoom: 1.4 } : HOME_VIEW);
+};
+document.getElementById("btn-home").onclick = () => map.easeTo(HOME_VIEW);
+
+// ---------------------------------------------------------------- sidebar
 function describe(e) {
   if (e.type === "login-failed" || e.type === "login-success") return `login ${esc(e.user)} / ${esc(e.pass)}${e.type === "login-success" ? " ✔" : ""}`;
   if (e.type === "command") return `$ ${esc(e.cmd)}`;
@@ -148,6 +233,9 @@ function bars(el, items, fmt = v => esc(v)) {
     : '<div style="color:var(--dim)">no data yet</div>';
 }
 
+const seen = new Set();
+let firstLoad = true, mapReady = false, lastPoints = null;
+
 function render(feed) {
   const s = feed.stats;
   document.getElementById("k-total").textContent = s.total.toLocaleString();
@@ -161,16 +249,22 @@ function render(feed) {
   bars("t-pass", s.top_passwords, v => `<code>${esc(v)}</code>`);
   bars("t-cmds", s.top_commands, v => `<code>${esc(v)}</code>`);
 
-  dots.clearLayers();
+  // one dot per location; colour = most frequent kind there
   const byLoc = new Map();
   for (const e of feed.events) {
-    const k = `${e.lat},${e.lon}`, cur = byLoc.get(k) || { e, n: 0 };
-    cur.n++; byLoc.set(k, cur);
+    const k = `${e.lat},${e.lon}`;
+    const cur = byLoc.get(k) || { e, n: 0, kinds: {} };
+    cur.n++; cur.kinds[kind(e)] = (cur.kinds[kind(e)] || 0) + 1;
+    byLoc.set(k, cur);
   }
-  for (const { e, n } of byLoc.values()) {
-    L.circleMarker([e.lat, e.lon], { radius: Math.min(3 + Math.log2(n) * 2, 14), color: COLORS[kind(e)], weight: 1, fillOpacity: .45 })
-      .bindTooltip(`${esc(e.city || "")} ${esc(e.country)} — ${n} event${n > 1 ? "s" : ""}`).addTo(dots);
-  }
+  const features = [...byLoc.values()].map(({ e, n, kinds }) => {
+    const top = Object.entries(kinds).sort((a, b) => b[1] - a[1])[0][0];
+    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] },
+             properties: { n, color: COLORS[top], city: e.city || "", country: e.country || "",
+                           kinds: Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ") } };
+  });
+  lastPoints = { type: "FeatureCollection", features };
+  if (mapReady) map.getSource("points").setData(lastPoints);
 
   const fresh = feed.events.filter(e => !seen.has(key(e)));
   fresh.forEach(e => seen.add(key(e)));
@@ -190,8 +284,6 @@ async function poll() {
     document.getElementById("updated").textContent = "reconnecting…";
   }
 }
-poll();
-setInterval(poll, POLL_MS);
 </script>
 </body>
 </html>
