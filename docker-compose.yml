@@ -121,7 +121,7 @@ include:
   - compose/homepage.yml
 
   # --- OPS / OBSERVABILITY ---
-  - compose/diun.yml
+#  - compose/diun.yml   # retired 2026-10-11: Renovate (self-hosted) replaces it; config kept in appdata/diun
 #  - compose/dozzle.yml
 
   # --- OTHER ---
