@@ -5,7 +5,7 @@
 services:
   tinyauth:
     container_name: tinyauth
-    image: ghcr.io/tinyauthapp/tinyauth:v5.2.0     # pinned; Diun notifies on new tags
+    image: ghcr.io/tinyauthapp/tinyauth:v5.2.0     # pinned; Renovate (manual tier) proposes updates
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

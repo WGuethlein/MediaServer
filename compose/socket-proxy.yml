@@ -27,15 +27,15 @@ services:
       # Revoked by default — re-enable per consumer
       AUTH: 0
       SECRETS: 0
-      POST: 0            # 2026-10-11: no consumer writes (Traefik/Diun/Homepage only read); POST=1 would let any container on socket_proxy create containers = root
+      POST: 0            # 2026-10-11: no consumer writes (Traefik/Homepage/Alloy only read); POST=1 would let any container on socket_proxy create containers = root
       # Not always needed — minimal grant
       BUILD: 0
       COMMIT: 0
       CONFIGS: 0
-      CONTAINERS: 1      # Traefik (label discovery), Diun, Dozzle
+      CONTAINERS: 1      # Traefik (label discovery), Homepage, Alloy (log shipping)
       DISTRIBUTION: 0
       EXEC: 0
-      IMAGES: 1          # Diun (image registry checks)
+      IMAGES: 1          # Homepage (image info)
       INFO: 1            # Dozzle
       NETWORKS: 1        # Traefik (network discovery)
       NODES: 0

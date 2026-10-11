@@ -38,7 +38,6 @@
         "ghcr.io/gethomepage/homepage",
         "golift/unpackerr",
         "markbeep/audiobookrequest",
-        "ghcr.io/crazy-max/diun",
         "lscr.io/linuxserver/sonarr",
         "lscr.io/linuxserver/radarr",
         "lscr.io/linuxserver/lidarr",

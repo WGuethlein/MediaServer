@@ -24,9 +24,9 @@ docker compose up -d
 # Tail a service
 docker compose logs -f <service>
 
-# Update images (after Diun notifies)
-docker compose pull
-docker compose up -d --remove-orphans
+# Updates are automatic: Renovate (nightly) + homelab-autoupdate (after the backup).
+# Manual one-off: edit the tag in compose/<app>.yml, commit + push, then:
+docker compose pull <service> && docker compose up -d --no-deps <service>
 
 # Stop everything
 docker compose down
