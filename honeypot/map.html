@@ -83,8 +83,10 @@ map.attributionControl.addAttribution('Map <a href="https://www.naturalearthdata
 fetch("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json")
   .then(r => r.json())
   .then(topo => {
-    L.geoJSON(topojson.feature(topo, topo.objects.countries), {
-      style: { color: "#24344d", weight: 0.6, fillColor: "#101a2a", fillOpacity: 1 },
+    const world = topojson.feature(topo, topo.objects.countries);
+    world.features = world.features.filter(f => f.id !== "010");   // Antarctica: edge artifact, no attackers
+    L.geoJSON(world, {
+      style: { color: "#2f4466", weight: 0.7, fillColor: "#16233a", fillOpacity: 1 },
       interactive: false
     }).addTo(map).bringToBack();
   });
