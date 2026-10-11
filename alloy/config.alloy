@@ -1,7 +1,8 @@
 // Alloy on wyatt-serv1 — ships logs to Loki on wyatt-mon (192.168.1.73:3100). 2026-10-11.
 // Sources: systemd journal, every container's stdout/stderr (via socket-proxy, read-only),
 // Traefik access log, AdGuard replica query log.
-// If wyatt-mon is down, Alloy buffers in its WAL (/var/lib/alloy/data) and retries.
+// If wyatt-mon is down, sends retry for ~2 h; file/journal positions only advance on read, so short
+// outages lose nothing that is still in the journal / on disk.
 
 logging {
   level = "warn"
@@ -10,12 +11,20 @@ logging {
 loki.write "mon" {
   endpoint {
     url = "http://192.168.1.73:3100/loki/api/v1/push"
+    // keep retrying ~2 h while wyatt-mon is down/rebooting (default gives up after ~10 tries)
+    max_backoff_period  = "1m"
+    max_backoff_retries = 120
   }
 }
 
 // ---------- systemd journal (sshd, sudo, kernel, docker, our homelab-* units) ----------
 loki.relabel "journal" {
   forward_to = []
+  // the journal source otherwise sets job to its component name
+  rule {
+    target_label = "job"
+    replacement  = "journal"
+  }
   rule {
     source_labels = ["__journal__systemd_unit"]
     target_label  = "unit"
