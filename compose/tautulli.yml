@@ -1,0 +1,32 @@
+# Tautulli — Plex watch history/stats + notifications. Added 2026-10-11.
+# Plex is host-networked: connect Tautulli to http://192.168.1.108:32400 (Settings → Plex Media Server).
+services:
+  tautulli:
+    container_name: tautulli
+    image: lscr.io/linuxserver/tautulli:v2.18.1-ls244
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - t3_proxy
+    volumes:
+      - ${DOCKERDIR}/appdata/tautulli:/config
+    environment:
+      TZ: ${TZ}
+      PUID: ${PUID}
+      PGID: ${PGID}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8181/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.tautulli-rtr.entrypoints=websecure
+      - traefik.http.routers.tautulli-rtr.rule=Host(`tautulli.${DOMAINNAME_1}`)
+      - traefik.http.routers.tautulli-rtr.middlewares=chain-tinyauth-lan@file
+      - traefik.http.routers.tautulli-rtr.service=tautulli-svc
+      - traefik.http.services.tautulli-svc.loadbalancer.server.port=8181
