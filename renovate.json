@@ -64,7 +64,6 @@
         "ghcr.io/tinyauthapp/tinyauth",
         "crowdsecurity/crowdsec",
         "tecnativa/docker-socket-proxy",
-        "qmcgaw/gluetun",
         "itzg/minecraft-server"
       ],
       "dependencyDashboardApproval": true,

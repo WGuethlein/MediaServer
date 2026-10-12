@@ -52,8 +52,6 @@ secrets:
     file: ${DOCKERDIR}/secrets/basic_auth_credentials
   plex_claim:
     file: ${DOCKERDIR}/secrets/plex_claim
-  surfshark_wg_private_key:
-    file: ${DOCKERDIR}/secrets/surfshark_wg_private_key
   mealie_oidc_client_secret:
     file: ${DOCKERDIR}/secrets/mealie_oidc_client_secret
   restic_password:
@@ -79,8 +77,6 @@ include:
   - compose/cloudflare-ddns.yml
 
   # --- VPN / DOWNLOADERS ---
-  - compose/gluetun.yml
-  - compose/qbittorrent.yml
   - compose/sabnzbd.yml
 
   # --- *ARR SUITE ---
@@ -94,7 +90,6 @@ include:
 
   # --- MEDIA SERVER ---
   - compose/plex.yml
-  - compose/tdarr.yml
 
   # --- REQUESTS & DASHBOARDS ---
   - compose/seerr.yml
@@ -111,4 +106,3 @@ include:
   # --- OTHER ---
   - compose/mealie.yml
   - compose/minecraft.yml
-  - compose/spiderfoot.yml
