@@ -1,0 +1,18 @@
+# Home Assistant is host-networked, so Traefik reaches it via the host IP. LAN + Tailscale only
+# (mobile app works away from home over Tailscale). No forward-auth: the HA app can't do it.
+http:
+  routers:
+    homeassistant-rtr:
+      entryPoints:
+        - websecure
+      rule: "Host(`ha.geet.dev`)"
+      service: homeassistant-svc
+      middlewares:
+        - chain-lan-only@file
+      tls: {}
+  services:
+    homeassistant-svc:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.108:8123"
+        passHostHeader: true

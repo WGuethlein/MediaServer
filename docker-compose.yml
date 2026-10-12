@@ -91,6 +91,8 @@ include:
   # --- MEDIA SERVER ---
   - compose/plex.yml
   - compose/tautulli.yml     # Plex stats/history (2026-10-11)
+  - compose/homeassistant.yml # home automation (2026-10-11)
+  - compose/backrest.yml     # restic backup browser/restore, read-only (2026-10-11)
 
   # --- REQUESTS & DASHBOARDS ---
   - compose/seerr.yml

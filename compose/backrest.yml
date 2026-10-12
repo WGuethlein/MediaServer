@@ -1,0 +1,36 @@
+# Backrest — web UI to browse/restore the EXISTING restic backups (local HDD + NAS). Added 2026-10-11.
+# Read-only: repos mounted :ro, every repo uses the --no-lock flag, NO plans, prune/check schedules DISABLED.
+# Backups are still made by udms-backup.sh. Restores can only go to /restore = /mnt/data/restore-scratch.
+services:
+  backrest:
+    container_name: backrest
+    image: ghcr.io/garethgeorge/backrest:v1.14.1
+    hostname: backrest
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - t3_proxy
+    environment:
+      TZ: ${TZ}
+      BACKREST_DATA: /data
+      BACKREST_CONFIG: /config/config.json
+      XDG_CACHE_HOME: /cache
+      TMPDIR: /tmp
+    volumes:
+      - ${DOCKERDIR}/appdata/backrest/data:/data
+      - ${DOCKERDIR}/appdata/backrest/config:/config
+      - ${DOCKERDIR}/appdata/backrest/cache:/cache
+      - ${DOCKERDIR}/appdata/backrest/tmp:/tmp
+      - /mnt/data/backups/restic-repo:/repos/local:ro
+      - /mnt/nas-backups/restic-repo:/repos/nas:ro
+      - ${DOCKERDIR}/secrets/restic_password:/run/secrets/restic_password:ro
+      - /mnt/data/restore-scratch:/restore
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.backrest-rtr.entrypoints=websecure
+      - traefik.http.routers.backrest-rtr.rule=Host(`backrest.${DOMAINNAME_1}`)
+      - traefik.http.routers.backrest-rtr.middlewares=chain-tinyauth-lan@file
+      - traefik.http.routers.backrest-rtr.service=backrest-svc
+      - traefik.http.services.backrest-svc.loadbalancer.server.port=9898

@@ -1,0 +1,21 @@
+# Home Assistant — home automation hub. Added 2026-10-11.
+# Host networking (device discovery: mDNS/SSDP/UPnP). Web UI only via Traefik → https://ha.geet.dev,
+# LAN + Tailscale only (traefik/rules/homeassistant.yml); HA's own login (+ MFA). Port 8123 is NOT opened in ufw.
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: ghcr.io/home-assistant/home-assistant:2026.9.4
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ${DOCKERDIR}/appdata/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    environment:
+      TZ: ${TZ}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8123/manifest.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
