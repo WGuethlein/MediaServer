@@ -1,7 +1,7 @@
 services:
   mealie:
     container_name: mealie
-    image: ghcr.io/mealie-recipes/mealie:v3.16.0
+    image: ghcr.io/mealie-recipes/mealie:v3.28.0
     restart: unless-stopped
     mem_limit: ${MEALIE_MEMORY}    # honors the MEALIE_MEMORY knob from .env
     security_opt:
