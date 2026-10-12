@@ -43,6 +43,8 @@ services:
       # ─── Entry points ─────────────────────────────────────────────
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s   # Immich video uploads (default 60s)
+      - --entrypoints.websecure.transport.respondingTimeouts.idleTimeout=600s
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.web.http.redirections.entrypoint.permanent=true

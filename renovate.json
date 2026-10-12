@@ -46,7 +46,8 @@
         "ghcr.io/seerr-team/seerr",
         "grafana/alloy",
         "python",
-        "nginxinc/nginx-unprivileged"
+        "nginxinc/nginx-unprivileged",
+        "lscr.io/linuxserver/tautulli"
       ],
       "matchUpdateTypes": [
         "minor",
@@ -64,7 +65,12 @@
         "ghcr.io/tinyauthapp/tinyauth",
         "crowdsecurity/crowdsec",
         "tecnativa/docker-socket-proxy",
-        "itzg/minecraft-server"
+        "itzg/minecraft-server",
+        "ghcr.io/immich-app/immich-server",
+        "ghcr.io/immich-app/immich-machine-learning",
+        "ghcr.io/immich-app/postgres",
+        "docker.io/valkey/valkey",
+        "valkey/valkey"
       ],
       "dependencyDashboardApproval": true,
       "automerge": false
@@ -83,6 +89,21 @@
         "/^lscr\\.io\\/linuxserver\\//"
       ],
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(\\.(?<build>\\d+))?(-ls(?<revision>\\d+))?$"
+    },
+    {
+      "description": "Immich server + ML must always run the SAME version: one PR/approval for both",
+      "matchPackageNames": [
+        "ghcr.io/immich-app/immich-server",
+        "ghcr.io/immich-app/immich-machine-learning"
+      ],
+      "groupName": "immich"
+    },
+    {
+      "description": "Beszel hub/agents should move together",
+      "matchPackageNames": [
+        "/^henrygd\\/beszel/"
+      ],
+      "groupName": "beszel"
     }
   ]
 }

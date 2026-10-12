@@ -1,0 +1,107 @@
+# Immich — photo/video backup (Google-Photos-like). Added 2026-10-11. Official v3.2.4 compose, adapted:
+#  - tags pinned here (Renovate); server + ML must always be the SAME version (Renovate group "immich").
+#  - services renamed immich-* (generic "redis"/"database" would collide in this include stack); own network.
+#  - originals on the NAS (/mnt/photos, NFS); thumbs + transcodes + DB + model cache on local NVMe.
+#  - DB is NEVER on NFS; consistent DB copies = Immich's own dumps in /mnt/photos/backups (daily 02:00, keep 14).
+#  - GPU: ML on CUDA, video transcoding via NVENC (enable in Admin → Video transcoding).
+#  - Web via Traefik photos.geet.dev with chain-no-auth-norl (no rate limit; the timeline fires hundreds of
+#    thumbnail requests). Login = Immich OAuth via tinyauth (Google) — forward-auth would break the mobile app.
+services:
+  immich-server:
+    container_name: immich-server
+    image: ghcr.io/immich-app/immich-server:v3.2.4
+    restart: unless-stopped
+    networks:
+      - immich
+      - t3_proxy
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    secrets:
+      - immich_db_password
+    environment:
+      TZ: ${TZ}
+      DB_HOSTNAME: immich-postgres
+      DB_USERNAME: postgres
+      DB_DATABASE_NAME: immich
+      DB_PASSWORD_FILE: /run/secrets/immich_db_password
+      REDIS_HOSTNAME: immich-redis
+      IMMICH_TRUSTED_PROXIES: ${TRAEFIK_IP}
+    volumes:
+      - ${IMMICH_UPLOAD_LOCATION}:/data
+      - ${DOCKERDIR}/appdata/immich/thumbs:/data/thumbs
+      - ${DOCKERDIR}/appdata/immich/encoded-video:/data/encoded-video
+      - /etc/localtime:/etc/localtime:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, video]
+    healthcheck:
+      disable: false
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.immich-rtr.entrypoints=websecure
+      - traefik.http.routers.immich-rtr.rule=Host(`photos.${DOMAINNAME_1}`)
+      - traefik.http.routers.immich-rtr.middlewares=chain-no-auth-norl@file
+      - traefik.http.routers.immich-rtr.service=immich-svc
+      - traefik.http.services.immich-svc.loadbalancer.server.port=2283
+
+  immich-machine-learning:
+    container_name: immich-machine-learning
+    image: ghcr.io/immich-app/immich-machine-learning:v3.2.4-cuda
+    restart: unless-stopped
+    networks:
+      - immich        # needs internet egress to download models
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKERDIR}/appdata/immich/model-cache:/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      disable: false
+
+  immich-redis:
+    container_name: immich-redis
+    image: docker.io/valkey/valkey:9@sha256:70739f85ad2ee01a726a965584a0f94895f01b0c60b3cc8b0aeef11eaa6888cf
+    restart: unless-stopped
+    networks:
+      - immich
+    healthcheck:
+      test: redis-cli ping || exit 1
+
+  immich-postgres:
+    container_name: immich-postgres
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    restart: unless-stopped
+    networks:
+      - immich
+    secrets:
+      - immich_db_password
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_PASSWORD_FILE: /run/secrets/immich_db_password
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ${DOCKERDIR}/appdata/immich/postgres:/var/lib/postgresql/data   # LOCAL disk only, never NFS
+    shm_size: 128mb
+    healthcheck:
+      disable: false
+
+networks:
+  immich:
+    name: immich
+
+secrets:
+  immich_db_password:
+    file: ${DOCKERDIR}/secrets/immich_db_password

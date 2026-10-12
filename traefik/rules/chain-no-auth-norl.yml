@@ -1,0 +1,9 @@
+# Like chain-no-auth but WITHOUT the rate limiter — for apps whose UI legitimately fires hundreds of requests
+# (Immich timeline thumbnails, parallel mobile uploads). Still: secure headers + CrowdSec. Added 2026-10-11.
+http:
+  middlewares:
+    chain-no-auth-norl:
+      chain:
+        middlewares:
+          - middlewares-secure-headers
+          - middlewares-crowdsec

@@ -64,6 +64,8 @@ secrets:
     file: ${DOCKERDIR}/secrets/tinyauth_mealie_oidc_secret
   tinyauth_users:
     file: ${DOCKERDIR}/secrets/tinyauth_users
+  tinyauth_immich_oidc_secret:
+    file: ${DOCKERDIR}/secrets/tinyauth_immich_oidc_secret
 
 ########################################
 # SERVICES — included from compose/*.yml
@@ -94,6 +96,7 @@ include:
   - compose/maintainerr.yml  # unwatched-media cleanup rules, safe mode (2026-10-11)
   - compose/homeassistant.yml # home automation (2026-10-11)
   - compose/backrest.yml     # restic backup browser/restore, read-only (2026-10-11)
+  - compose/immich.yml       # photos (2026-10-11)
 
   # --- REQUESTS & DASHBOARDS ---
   - compose/seerr.yml

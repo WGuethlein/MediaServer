@@ -18,6 +18,7 @@ services:
       - google_oauth_client_secret
       - tinyauth_mealie_oidc_secret
       - tinyauth_users
+      - tinyauth_immich_oidc_secret
     environment:
       TZ: ${TZ}
       TINYAUTH_APPURL: https://${TINYAUTH_SUBDOMAIN}.${DOMAINNAME_1}
@@ -41,6 +42,11 @@ services:
       TINYAUTH_OIDC_CLIENTS_MEALIE_CLIENTSECRETFILE: /run/secrets/tinyauth_mealie_oidc_secret
       TINYAUTH_OIDC_CLIENTS_MEALIE_TRUSTEDREDIRECTURIS: https://${MEALIE_SUBDOMAIN}.${DOMAINNAME_1}/login
       TINYAUTH_OIDC_CLIENTS_MEALIE_NAME: Mealie
+      # Immich (photos): web + mobile app (custom scheme app.immich:/// is an exact-match redirect)
+      TINYAUTH_OIDC_CLIENTS_IMMICH_CLIENTID: ${TINYAUTH_IMMICH_CLIENT_ID}
+      TINYAUTH_OIDC_CLIENTS_IMMICH_CLIENTSECRETFILE: /run/secrets/tinyauth_immich_oidc_secret
+      TINYAUTH_OIDC_CLIENTS_IMMICH_TRUSTEDREDIRECTURIS: https://photos.${DOMAINNAME_1}/auth/login,https://photos.${DOMAINNAME_1}/user-settings,https://photos.${DOMAINNAME_1}/api/oauth/mobile-redirect,app.immich:///oauth-callback
+      TINYAUTH_OIDC_CLIENTS_IMMICH_NAME: Immich
       # Admin apps: owner-only (exact email). Keep in sync with routers using chain-tinyauth-lan.
       TINYAUTH_APPS_SONARR_CONFIG_DOMAIN: ${SONARR_SUBDOMAIN}.${DOMAINNAME_1}
       TINYAUTH_APPS_SONARR_OAUTH_WHITELIST: ${TINYAUTH_OWNER_EMAIL}
