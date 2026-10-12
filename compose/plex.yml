@@ -30,7 +30,8 @@ services:
       # Plex docs say PLEX_UID/PLEX_GID, not PUID/PGID
       PLEX_UID: ${PUID}
       PLEX_GID: ${PGID}
-      ADVERTISE_IP: "http://${SERVER_IP}:32400/"
+      # plex.geet.dev (Traefik, 443) is the remote path: works through corporate proxies, CrowdSec-protected
+      ADVERTISE_IP: "https://plex.geet.dev:443,http://${SERVER_IP}:32400/"
       ALLOWED_NETWORKS: ${LOCAL_IPS}
       # Tell Plex its transcoder dir
       PLEX_TRANSCODE_DIR: /transcode
