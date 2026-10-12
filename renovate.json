@@ -104,6 +104,13 @@
         "/^henrygd\\/beszel/"
       ],
       "groupName": "beszel"
+    },
+    {
+      "description": "Plex tags are <major>.<minor>.<patch>.<build>-<githash>; ignore the hash when comparing versions",
+      "matchPackageNames": [
+        "plexinc/pms-docker"
+      ],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)-[0-9a-f]+$"
     }
   ]
 }
