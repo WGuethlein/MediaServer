@@ -2,5 +2,7 @@ http:
   middlewares:
     middlewares-rate-limit:
       rateLimit:
-        average: 100
-        burst: 50
+        # per client IP. Modern web apps (Maintainerr, Seerr, Immich…) load 100+ JS chunks at once;
+        # burst 50 returned 429s and blank pages (2026-10-11). CrowdSec handles real abuse.
+        average: 200
+        burst: 500
