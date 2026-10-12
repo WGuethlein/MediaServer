@@ -1,7 +1,7 @@
 services:
   cloudflare-ddns:
     container_name: cloudflare-ddns
-    image: favonia/cloudflare-ddns:1.15.1
+    image: favonia/cloudflare-ddns:1.17.1
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
