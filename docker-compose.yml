@@ -106,6 +106,7 @@ include:
   - compose/listenarr.yml
   - compose/homepage.yml
   - compose/alloy.yml        # log shipper → Loki on wyatt-mon (2026-10-11)
+  - compose/beszel-agent.yml # host/GPU/SMART/container metrics → Beszel hub on wyatt-mon (2026-10-11)
   - compose/attackfeed.yml   # public scrubbed attack feed + live map (2026-10-11)
   - compose/honeypot.yml     # Cowrie honeypot — isolated by homelab-honeypot-egress.service (2026-10-11)
 
