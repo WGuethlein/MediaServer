@@ -1,0 +1,27 @@
+# SuggestArr — "similar to what you watch": reads recent Plex watch history, finds similar titles on TMDb and
+# requests them through Seerr (small: no AI model, no GPU). Added 2026-10-11. Configured in its web UI
+# (https://suggestarr.geet.dev): TMDb key, Plex, Seerr. Owner limits: weekly, few items per watched title.
+services:
+  suggestarr:
+    container_name: suggestarr
+    image: ciuse99/suggestarr:v2.15.0
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default
+      - t3_proxy
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+      SUGGESTARR_PORT: "5000"
+    volumes:
+      - ${DOCKERDIR}/appdata/suggestarr:/app/config/config_files
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.suggestarr-rtr.entrypoints=websecure
+      - traefik.http.routers.suggestarr-rtr.rule=Host(`suggestarr.${DOMAINNAME_1}`)
+      - traefik.http.routers.suggestarr-rtr.middlewares=chain-tinyauth-lan@file
+      - traefik.http.routers.suggestarr-rtr.service=suggestarr-svc
+      - traefik.http.services.suggestarr-svc.loadbalancer.server.port=5000
