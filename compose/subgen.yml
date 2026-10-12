@@ -1,0 +1,32 @@
+# Subgen — Whisper (faster-whisper) subtitle generation on the GPU, used by Bazarr as the "Whisper"
+# provider when no subtitle can be downloaded. Added 2026-10-11. One job at a time; VRAM is released
+# after each job so Plex NVENC / Immich ML keep priority. Bazarr provider endpoint: http://subgen:9000
+services:
+  subgen:
+    container_name: subgen
+    image: mccloud/subgen:2026.07.3
+    restart: unless-stopped
+    networks:
+      - default
+    environment:
+      TZ: ${TZ}
+      TRANSCRIBE_DEVICE: cuda
+      WHISPER_MODEL: medium            # ~1.5–2 GB VRAM; good English accuracy on a 2080
+      CONCURRENT_TRANSCRIPTIONS: "1"
+      CLEAR_VRAM_ON_COMPLETE: "True"
+      MODEL_PATH: /subgen/models
+      USE_PATH_MAPPING: "False"
+      WEBHOOKPORT: "9000"
+      DEBUG: "False"
+    volumes:
+      - ${DOCKERDIR}/appdata/subgen/models:/subgen/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

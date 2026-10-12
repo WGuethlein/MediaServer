@@ -87,6 +87,7 @@ include:
   - compose/radarr.yml
   - compose/lidarr.yml
   - compose/bazarr.yml
+  - compose/subgen.yml       # Whisper subtitles for Bazarr, GPU (2026-10-11)
   - compose/flaresolverr.yml
   - compose/unpackerr.yml
 
