@@ -1,0 +1,30 @@
+# Recyclarr — keeps Sonarr/Radarr quality profiles + custom formats in sync with TRaSH Guides. Added 2026-10-11.
+# Config: appdata/recyclarr/recyclarr.yml (source: HomeAutomation/configs/recyclarr). Runs daily 04:15 (after
+# the 03:40 backup, so a bad sync is always restorable from last night's snapshot). Rootless image: user: not PUID.
+services:
+  recyclarr:
+    container_name: recyclarr
+    image: ghcr.io/recyclarr/recyclarr:8.7.2
+    restart: unless-stopped
+    user: ${PUID}:${PGID}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - default        # reaches sonarr:8989 / radarr:7878 by name
+    environment:
+      TZ: ${TZ}
+      CRON_SCHEDULE: "15 4 * * *"
+    volumes:
+      - ${DOCKERDIR}/appdata/recyclarr:/config
+    secrets:
+      - sonarr_api_key
+      - radarr_api_key
+
+secrets:
+  sonarr_api_key:
+    file: ${DOCKERDIR}/secrets/sonarr_api_key
+  radarr_api_key:
+    file: ${DOCKERDIR}/secrets/radarr_api_key
