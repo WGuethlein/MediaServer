@@ -1,0 +1,64 @@
+# Beszel agent — host/container/GPU/SMART metrics → Beszel hub on wyatt-mon (192.168.1.73:8090). Added 2026-10-11.
+# Host networking (real host NIC/disk stats); talks to Docker through its OWN read-only socket proxy bound to
+# 127.0.0.1:2376 (it can't reach the main socket-proxy from the host network). WebSocket to the hub; no open ports.
+services:
+  beszel-socket-proxy:
+    container_name: beszel-socket-proxy
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    privileged: true   # read /var/run/docker.sock (same as socket-proxy)
+    networks:
+      - beszel_dsp
+    ports:
+      - 127.0.0.1:2376:2375
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      IMAGES: 0        # no registry update checks (Renovate does that)
+      INFO: 1
+      POST: 0
+
+  beszel-agent:
+    container_name: beszel-agent
+    image: henrygd/beszel-agent-nvidia:0.20.0   # full tag: nvidia-smi + smartctl
+    restart: unless-stopped
+    network_mode: host
+    depends_on: [beszel-socket-proxy]
+    cap_add: [SYS_RAWIO, SYS_ADMIN]             # SATA + NVMe SMART
+    devices:
+      - /dev/nvme0:/dev/nvme0
+      - /dev/sda:/dev/sda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [utility]
+    volumes:
+      - ${DOCKERDIR}/appdata/beszel-agent:/var/lib/beszel-agent
+      - /mnt/data/.beszel:/extra-filesystems/data:ro          # show the backup HDD
+    secrets:
+      - beszel_token
+    environment:
+      TZ: ${TZ}
+      HUB_URL: http://192.168.1.73:8090
+      KEY: ${BESZEL_KEY}
+      TOKEN_FILE: /run/secrets/beszel_token
+      DISABLE_SSH: "true"
+      DOCKER_HOST: tcp://127.0.0.1:2376
+      DOCKER_IMAGE_CHECK: "false"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  beszel_dsp:
+    name: beszel_dsp
+
+secrets:
+  beszel_token:
+    file: ${DOCKERDIR}/secrets/beszel_token
