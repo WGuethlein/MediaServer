@@ -7,7 +7,7 @@ tok=$(cat secrets/attackfeed_token) || exit 2
 dir="appdata/attackfeed/$tok"
 [ -d "$dir" ] || { echo "no feed dir"; exit 2; }
 unreadable=$(find "$dir" ! -readable 2>/dev/null | head -5)
-if [ -n "$unreadable" ]; then echo "UNREADABLE: $(echo "$unreadable" | sed "s#$dir/##" | tr '\n' ' ')"; exit 2; fi
+if [ -n "$unreadable" ]; then echo "UNREADABLE: $(echo "$unreadable" | sed "s#^$dir\$#<token-dir>#; s#$dir/##" | tr '\n' ' ')"; exit 2; fi
 wan=$(curl -fsS --max-time 10 https://1.1.1.1/cdn-cgi/trace | sed -n 's/^ip=//p')
 [ -n "$wan" ] || { echo "could not determine WAN IP"; exit 2; }
 fail=0
