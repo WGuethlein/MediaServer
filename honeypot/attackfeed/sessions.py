@@ -1,5 +1,5 @@
 """Cowrie sessions -> replayable line lists. Reads tty logs read-only; never raises on bad files."""
-import os, statistics, struct
+import codecs, os, statistics, struct
 from collections import defaultdict
 from .analyze import iso
 from .scrub import strip_ansi
@@ -8,6 +8,19 @@ TTY = struct.Struct("<iLiiLL")
 OP_WRITE, TYPE_INPUT, TYPE_OUTPUT = 3, 1, 2
 NS = 10**9
 RANK = {"hands-on": 0, "dropper": 1}
+
+def apply_backspaces(s):
+    """Applies DEL/BS editing (a typed, corrected address must reach the scrubber in its final form)."""
+    if "\x7f" not in s and "\x08" not in s:
+        return s
+    out = []
+    for ch in s:
+        if ch in "\x7f\x08":
+            if out and out[-1] != "\n":
+                out.pop()
+        else:
+            out.append(ch)
+    return "".join(out)
 
 def parse_ttylog(path, scrub, max_bytes=65536, max_events=2000):
     """Cowrie logs one record per keystroke, so text is buffered per direction and scrubbed
@@ -19,11 +32,12 @@ def parse_ttylog(path, scrub, max_bytes=65536, max_events=2000):
         return []
     out, used = [], [0]
     buf = {TYPE_INPUT: ["", 0.0], TYPE_OUTPUT: ["", 0.0]}   # direction -> [raw text, t of first record]
+    dec = {d: codecs.getincrementaldecoder("utf-8")("replace") for d in buf}   # a character split across records
 
     def emit(direction, raw, t):
         if len(out) >= max_events or used[0] >= max_bytes:
             return
-        text = scrub.text(strip_ansi(raw), cap=max_bytes - used[0])
+        text = scrub.text(apply_backspaces(strip_ansi(raw)), cap=max_bytes - used[0])
         if not text:
             return
         used[0] += len(text)
@@ -45,48 +59,60 @@ def parse_ttylog(path, scrub, max_bytes=65536, max_events=2000):
         if direction not in buf:
             continue
         b = buf[direction]
-        if not b[0]:
+        if not b[0] and not dec[direction].getstate()[0]:   # nothing buffered, no pending partial char
             b[1] = t - t0
-        b[0] += chunk.decode("utf-8", "replace")
+        b[0] += dec[direction].decode(chunk)
         while "\n" in b[0]:
             line, b[0] = b[0].split("\n", 1)
             emit(direction, line + "\n", b[1])
             b[1] = t - t0
     for direction, b in buf.items():
+        b[0] += dec[direction].decode(b"", final=True)
         if b[0]:
             emit(direction, b[0], b[1])
     out.sort(key=lambda r: r[0])
     return out
 
-def build(events, tty_dir, scrub):
+def _one(sid, rows, tty_dir, scrub):
+    rows.sort(key=lambda r: r["ts"])
+    login = next((r for r in rows if r["type"] == "login-success"), None)
+    cmds = [r for r in rows if r["type"] == "command" and r.get("cmd")]     # bare Enter is stored without cmd
+    closed = next((r for r in rows if r["type"] == "closed"), None)
+    if not login or not (cmds or (closed and closed.get("ttylog"))):
+        return None
+    lines, has_tty = [], False
+    if closed and closed.get("ttylog"):
+        lines = parse_ttylog(os.path.join(tty_dir, os.path.basename(closed["ttylog"])), scrub)
+        has_tty = bool(lines)
+    if not lines:
+        t0 = login["ts"]
+        lines = [[round((r["ts"] - t0) / NS, 3), "i", r["cmd"]] for r in cmds]
+    ins = [t for t, d, _ in lines if d == "i"]
+    gaps = [b - a for a, b in zip(ins, ins[1:])]
+    client = next((r.get("client") for r in rows if r.get("client")), None)
+    return {k: v for k, v in {
+        "id": sid, "src": login["src"], "start": iso(login["ts"]),
+        "duration": closed.get("duration") if closed else round((rows[-1]["ts"] - login["ts"]) / NS, 1),
+        "user": login.get("user"), "pass": login.get("pass"), "proto": login.get("proto"), "client": client,
+        "lines": lines, "gaps_median": statistics.median(gaps) if gaps else 0.0, "has_tty": has_tty}.items()
+        if v is not None}
+
+def build(events, tty_dir, scrub, log=None):
+    """One broken session is logged and skipped; it never empties the others."""
     by = defaultdict(list)
     for e in events:
         if e.get("source") == "cowrie" and e.get("session"):
             by[e["session"]].append(e)
     out = {}
     for sid, rows in by.items():
-        rows.sort(key=lambda r: r["ts"])
-        login = next((r for r in rows if r["type"] == "login-success"), None)
-        cmds = [r for r in rows if r["type"] == "command"]
-        closed = next((r for r in rows if r["type"] == "closed"), None)
-        if not login or not (cmds or (closed and closed.get("ttylog"))):
+        try:
+            s = _one(sid, rows, tty_dir, scrub)
+        except Exception as ex:  # noqa: BLE001
+            if log:
+                log(f"session {sid} skipped: {ex!r}")
             continue
-        lines, has_tty = [], False
-        if closed and closed.get("ttylog"):
-            lines = parse_ttylog(os.path.join(tty_dir, os.path.basename(closed["ttylog"])), scrub)
-            has_tty = bool(lines)
-        if not lines:
-            t0 = login["ts"]
-            lines = [[round((r["ts"] - t0) / NS, 3), "i", r["cmd"]] for r in cmds]
-        ins = [t for t, d, _ in lines if d == "i"]
-        gaps = [b - a for a, b in zip(ins, ins[1:])]
-        client = next((r.get("client") for r in rows if r.get("client")), None)
-        out[sid] = {k: v for k, v in {
-            "id": sid, "src": login["src"], "start": iso(login["ts"]),
-            "duration": closed.get("duration") if closed else round((rows[-1]["ts"] - login["ts"]) / NS, 1),
-            "user": login.get("user"), "pass": login.get("pass"), "proto": login.get("proto"), "client": client,
-            "lines": lines, "gaps_median": statistics.median(gaps) if gaps else 0.0, "has_tty": has_tty}.items()
-            if v is not None}
+        if s:
+            out[sid] = s
     return out
 
 def _camp_of_src(camps):

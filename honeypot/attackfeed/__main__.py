@@ -1,5 +1,6 @@
 """attackfeed-gen v2 main loop. See docs/honeypot.md."""
 import datetime as dt, json, os, re, shutil, sys, time, urllib.request
+from collections import Counter
 from . import analyze as A, ingest as I, publish as P, sessions as S
 from .baseline import ATTRIBUTION, Baseline, compare
 from .config import load
@@ -7,7 +8,8 @@ from .loki import query_range
 from .scrub import Scrubber
 from .store import Store
 
-NS, D = 10**9, 86400 * 10**9
+NS, H, D = 10**9, 3600 * 10**9, 86400 * 10**9
+WAN_RECHECK_S = 300           # a WAN change is learned (and scrubbed) within 5 min
 TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 EMPTY_BASELINE = {"ports": [], "usernames": [], "research_ips": frozenset(), "fetched": None, "attribution": ATTRIBUTION}
 
@@ -73,46 +75,66 @@ def _baseline_view(b, stats, scrub):
             "fetched": b["fetched"], "attribution": b["attribution"]}
 
 
+def load_rows(store, now_ns, cfg):
+    """Memory-bounded loading: full rows only for the last 24 h (all sources) and for the 7 days of cowrie rows
+    (small). Everything else that spans 7 days comes from SQL aggregates (trends, per-IP summaries, ports)."""
+    lo = now_ns - max(cfg.window_hours, 24) * H
+    recent = store.events(lo)
+    old_cowrie = store.events(now_ns - cfg.history_days * D, sources=("cowrie",), until=lo)
+    cowrie = old_cowrie + [e for e in recent if e["source"] == "cowrie"]
+    return recent, cowrie, old_cowrie + recent
+
+
 def cycle(cfg, store, fetch, scrub, baseline, now_ns, tdir, log=log, sleep=time.sleep):
     _try(log, "ingest", lambda: _pull(store, fetch, scrub, now_ns, cfg.history_days, log, sleep), None)
-    events = store.events(now_ns - cfg.history_days * D)
-    stats = A.counts(events, now_ns, cfg.window_hours)
+    since7 = now_ns - cfg.history_days * D
+    recent, cowrie, rows = load_rows(store, now_ns, cfg)
+    stats = A.counts(recent, now_ns, cfg.window_hours)
     b = _try(log, "baseline", baseline.get, None) or EMPTY_BASELINE
-    camps = _try(log, "campaigns", lambda: A.campaigns(events), [])
-    sess = _try(log, "sessions", lambda: S.build(events, cfg.tty_dir, scrub), {})
+    camps = _try(log, "campaigns", lambda: A.campaigns(cowrie), [])
+    sess = _try(log, "sessions", lambda: S.build(cowrie, cfg.tty_dir, scrub, log=log), None)
+    sessions_ok = sess is not None                  # a failed build must never prune the published session files
+    sess = sess or {}
     gaps = {k: v.get("gaps_median", 0) for k, v in sess.items() if v.get("has_tty")}
-    profs = _try(log, "profiles", lambda: A.profiles(events, now_ns, camps, b["research_ips"], gaps), {})
+
+    def build_profiles():                           # every IP seen in 24 h or in cowrie (verdicts); no ports yet
+        summ = store.ip_summary(since7, {e["src"] for e in rows})
+        return A.build_profiles(summ, rows, now_ns, camps, b["research_ips"], gaps)
+    profs = _try(log, "profiles", build_profiles, {})
     verdicts = {ip: p["verdict"] for ip, p in profs.items() if p.get("verdict")}
     replayable = {k: v for k, v in sess.items() if v.get("lines") and P.SESSION_ID.match(str(v.get("id", "")))}
-    chosen = _try(log, "session select", lambda: S.select(replayable, profs, camps, cfg.max_sessions), [])
+    chosen = _try(log, "session select", lambda: S.select(replayable, profs, camps, cfg.max_sessions), None)
+    sessions_ok = sessions_ok and chosen is not None
+    chosen = chosen or []
+    write = lambda name, obj: P.write_json(os.path.join(tdir, name), P.guard(obj, scrub))
 
     def insights():
         keep = {ip for c in camps for ip in c["members"][:50]} | {s["src"] for s in chosen}
         top = sorted(profs.values(), key=lambda p: -p.get("n24", 0))[:300]
         pub_profiles = {p["ip"]: p for p in top} | {ip: profs[ip] for ip in keep if ip in profs}
+        ports = _try(log, "ports", lambda: store.top_ports(since7, set(pub_profiles)), {})
+        pub_profiles = {ip: {**p, "ports": A._top(ports.get(ip, Counter()), 8)} for ip, p in pub_profiles.items()}
         part = lambda what, fn, d: _try(log, what, fn, d)
         ins = P.build_insights(
-            now_ns, cfg.history_days, part("locations", lambda: A.locations(events, now_ns, cfg.window_hours), []),
-            pub_profiles, camps, part("trends", lambda: A.trends(events, now_ns), {}),
-            part("baseline view", lambda: _baseline_view(b, stats, scrub), None), part("malware", lambda: A.malware(events), []),
+            now_ns, cfg.history_days, part("locations", lambda: A.locations(recent, now_ns, cfg.window_hours), []),
+            pub_profiles, camps, part("trends", lambda: A.trends_from(store.trend_counts(since7, now_ns), now_ns), {}),
+            part("baseline view", lambda: _baseline_view(b, stats, scrub), None), part("malware", lambda: A.malware(cowrie), []),
             [S.index_entry(s, profs, camps) for s in chosen], cfg.window_hours)
-        P.write_json(os.path.join(tdir, "insights.json"), ins)
+        write("insights.json", ins)
 
     def index_html():
         with open(cfg.map_html, encoding="utf-8") as f:
             P.write_text(os.path.join(tdir, "index.html"), f.read())
 
     sdir = os.path.join(tdir, "sessions")
-    pub_sessions = [{k: v for k, v in s.items() if k not in ("gaps_median", "has_tty")} for s in chosen]
+    pub_sessions = P.guard([{k: v for k, v in s.items() if k not in ("gaps_median", "has_tty")} for s in chosen], scrub)
     _try(log, "index.html", index_html, None)
     _try(log, "sessions write", lambda: P.sync_sessions(sdir, pub_sessions, remove=False), None)   # new files first,
-    if _try(log, "insights", lambda: insights() or True, False):                                   # then the index,
+    if _try(log, "insights", lambda: insights() or True, False) and sessions_ok:                   # then the index,
         _try(log, "sessions prune", lambda: P.sync_sessions(sdir, pub_sessions), None)             # then stale removal
-    _try(log, "live", lambda: P.write_json(os.path.join(tdir, "live.json"),
-                                           P.build_live(events, stats, now_ns, cfg.live_minutes, verdicts)), None)
-    _try(log, "feed", lambda: P.write_json(os.path.join(tdir, "feed.json"),
-                                           P.build_feed(events, stats, now_ns, cfg.max_events, verdicts,
-                                                        cfg.window_hours)), None)
+    _try(log, "live", lambda: write("live.json", P.build_live(recent, stats, now_ns, cfg.live_minutes, verdicts)), None)
+    _try(log, "feed", lambda: write("feed.json", P.build_feed(recent, stats, now_ns, cfg.max_events, verdicts,
+                                                              cfg.window_hours)), None)
     return {"events": stats["total"], "sources": stats["unique_sources"], "campaigns": len(camps),
             "sessions": len(chosen), "camps": camps}
 
@@ -144,7 +166,7 @@ def main():
     home_checked, last_prune, last_camp = time.time(), 0.0, 0.0
     while True:
         now = time.time()
-        if now - home_checked > 3600:
+        if now - home_checked > WAN_RECHECK_S:
             set_home(scrub, store, wan_ip())
             home_checked = now
         try:

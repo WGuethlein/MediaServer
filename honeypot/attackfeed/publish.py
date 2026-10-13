@@ -55,6 +55,26 @@ def build_insights(now_ns, history_days, locations, profiles, camps, trends, bas
             "trends": trends, "baseline": baseline_view, "malware": malware[:50], "sessions": session_index}
 
 
+def guard(obj, scrub):
+    """Last line before anything is written: drops every record (dict with src/ip, dict key, bare string) that is a
+    known home IP and re-scrubs every string uncapped. Rows stored before a WAN change was learned are caught here."""
+    homes = scrub.home_ips
+
+    def home(v):
+        return isinstance(v, dict) and (v.get("src") in homes or v.get("ip") in homes) or \
+            isinstance(v, str) and v in homes
+
+    def walk(v):
+        if isinstance(v, str):
+            return scrub.text(v, cap=None)
+        if isinstance(v, dict):
+            return {k: walk(x) for k, x in v.items() if not home(x) and not (isinstance(k, str) and k in homes)}
+        if isinstance(v, (list, tuple)):
+            return [walk(x) for x in v if not home(x)]
+        return v
+    return walk(obj)
+
+
 def write_json(path, obj):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:

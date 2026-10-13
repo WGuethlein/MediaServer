@@ -16,6 +16,16 @@ class Scrubber:
         self.home_ip = home_ip                              # current WAN (gates ingest)
         self.home_ips = {home_ip} if home_ip else set()     # every WAN ever seen: all are scrubbed
         self.words = tuple(sorted({*HOSTS, *words}, key=len, reverse=True))   # longest first
+        self._words_re = re.compile("|".join(map(re.escape, self.words)), re.I) if self.words else None
+        self._homes_key, self._homes_re = None, None
+
+    def _homes(self):
+        key = frozenset(self.home_ips)
+        if key != self._homes_key:
+            self._homes_key = key
+            alts = "|".join(map(re.escape, sorted(key, key=len, reverse=True)))
+            self._homes_re = re.compile(rf"(?<!\d)(?:{alts})(?!\d)") if key else None
+        return self._homes_re
 
     def remember(self, ip):
         """Adds a past home IP (scrubbed, dropped as a source) without making it current. True if new."""
@@ -34,12 +44,13 @@ class Scrubber:
         if not s:
             return s
         s = str(s)
-        for ip in self.home_ips:
-            s = re.sub(rf"(?<!\d){re.escape(ip)}(?!\d)", "x.x.x.x", s)
+        homes = self._homes()
+        if homes:
+            s = homes.sub("x.x.x.x", s)
         s = PRIVATE.sub("x.x.x.x", s)
-        for w in self.words:
-            s = re.sub(re.escape(w), "redacted", s, flags=re.I)
-        if len(s) > cap:                       # scrub first, then cap
+        if self._words_re:
+            s = self._words_re.sub("redacted", s)
+        if cap is not None and len(s) > cap:   # scrub first, then cap
             s = PARTIAL_IP.sub("", s[:cap])    # never leave a cut-off address behind
         return s
 

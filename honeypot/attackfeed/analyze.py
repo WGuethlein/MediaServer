@@ -155,12 +155,42 @@ def _hands_on(rows, session_gaps):
     return len(cmd_rows) >= 3 and any(_first_word(r["cmd"]) not in BOT_VOCAB for r in cmd_rows if _first_word(r["cmd"]))
 
 
+def ip_summary_add(out, e, n, lo, hi):
+    a = out.get(e["src"])
+    if a is None:
+        a = out[e["src"]] = {"first": lo, "last": hi, "n7": 0, "kinds": Counter()}
+    a["first"], a["last"] = min(a["first"], lo), max(a["last"], hi)
+    a["n7"] += n
+    a["kinds"][kind(e)] += n
+
+
+def ip_summary(events):
+    """{ip: {first, last, n7, kinds}} over the given rows (the in-memory twin of Store.ip_summary)."""
+    out = {}
+    for x in sorted(events, key=lambda r: r["ts"]):
+        ip_summary_add(out, x, 1, x["ts"], x["ts"])
+    return out
+
+
 def profiles(events, now_ns, camps, research_ips=frozenset(), session_gaps=None):
-    """session_gaps: {session: MEDIAN inter-input gap in seconds} (tty sessions only)."""
+    """session_gaps: {session: MEDIAN inter-input gap in seconds} (tty sessions only). All rows in memory:
+    the generator itself uses build_profiles with SQL aggregates (Store.ip_summary / top_ports)."""
+    ports = defaultdict(Counter)
+    for x in sorted(events, key=lambda r: r["ts"]):
+        if x.get("port"):
+            ports[x["src"]][x["port"]] += 1
+    return build_profiles(ip_summary(events), events, now_ns, camps, research_ips, session_gaps, ports)
+
+
+def build_profiles(summary, rows, now_ns, camps, research_ips=frozenset(), session_gaps=None, ports=None):
+    """summary: 7-day per-IP aggregates. rows: every row of the last 24 h plus all cowrie rows of the 7 days
+    (geo, n24, creds, cmds, sessions and hands-on come from these). ports: {ip: Counter}; None leaves ports out
+    (the caller adds them for the published IPs only). Profiles are built for IPs present in both."""
     session_gaps = session_gaps or {}
     by_ip = defaultdict(list)
-    for x in events:
-        by_ip[x["src"]].append(x)
+    for x in rows:
+        if x["src"] in summary:
+            by_ip[x["src"]].append(x)
     camp_of = defaultdict(list)
     for c in camps:
         for ip in c["members"]:
@@ -168,17 +198,17 @@ def profiles(events, now_ns, camps, research_ips=frozenset(), session_gaps=None)
     out = {}
     for ip, rows in by_ip.items():
         rows.sort(key=lambda r: r["ts"])
+        sm = summary[ip]
         g = next((r for r in rows if "lat" in r), rows[-1])
         cmds = list(dict.fromkeys(r["cmd"] for r in rows if r.get("cmd")))
         sessions = sorted({r["session"] for r in rows if r.get("session")})
         p = {"ip": ip, "asn": g.get("asn"), "org": g.get("org"), "cc": g.get("cc"), "country": g.get("country"),
-             "city": g.get("city"), "first": iso(rows[0]["ts"]), "last": iso(rows[-1]["ts"]),
-             "returning": rows[0]["ts"] // D < rows[-1]["ts"] // D,
-             "kinds": dict(Counter(kind(r) for r in rows)),
-             "ports": _top(Counter(r["port"] for r in rows if r.get("port")), 8),
+             "city": g.get("city"), "first": iso(sm["first"]), "last": iso(sm["last"]),
+             "returning": sm["first"] // D < sm["last"] // D, "kinds": dict(sm["kinds"]),
+             "ports": _top(ports.get(ip, Counter()), 8) if ports is not None else None,
              "creds": _top(Counter(f"{r.get('user', '')} / {r.get('pass', '')}" for r in rows if r["type"].startswith("login")), 8),
              "cmds": cmds[:20], "sessions": sessions[-10:], "campaigns": camp_of.get(ip, []),
-             "n24": sum(1 for r in rows if r["ts"] >= now_ns - D), "n7": len(rows)}
+             "n24": sum(1 for r in rows if r["ts"] >= now_ns - D), "n7": sm["n7"]}
         p["verdict"] = verdict({**p, "cmds": cmds, "hands_on": _hands_on(rows, session_gaps)}, research_ips)
         out[ip] = {k: v for k, v in p.items() if v not in (None, "")}
     return out
@@ -188,28 +218,40 @@ CHANNEL = {"firewall": "firewall", "ips": "ips", "web": "web", "cowrie": "honeyp
 
 
 def trends(events, now_ns):
+    """In-memory twin of trends_from(Store.trend_counts(...)) over the given rows."""
+    by_hour, by_age, oldest = Counter(), Counter(), None
+    for x in events:
+        if x["ts"] <= now_ns:
+            by_hour[(x["source"], x["ts"] // H)] += 1
+            by_age[(x["source"], (now_ns - x["ts"]) // H)] += 1
+            oldest = x["ts"] if oldest is None else min(oldest, x["ts"])
+    return trends_from({"by_hour": by_hour, "by_age": by_age, "oldest": oldest}, now_ns)
+
+
+def trends_from(tc, now_ns):
+    """tc: {"by_hour": {(source, ts // H): n}, "by_age": {(source, (now - ts) // H): n}, "oldest": ts or None}."""
     chans = list(dict.fromkeys(CHANNEL.values()))
     grid = {c: [[0] * 24 for _ in range(7)] for c in chans}
     days = {c: [0] * 7 for c in chans}
     hourly = {c: [0] * 24 for c in chans}
     today = dt.datetime.fromtimestamp(now_ns / NS, dt.timezone.utc).date()
-    for x in events:
-        age = now_ns - x["ts"]
-        c = CHANNEL.get(x["source"])
-        if age < 0 or not c:
+    for (source, hour), n in tc["by_hour"].items():
+        c = CHANNEL.get(source)
+        if not c:
             continue
-        t = dt.datetime.fromtimestamp(x["ts"] / NS, dt.timezone.utc)
+        t = dt.datetime.fromtimestamp(hour * 3600, dt.timezone.utc)
         back = (today - t.date()).days                  # grid rows are UTC calendar days, row 6 = today so far
         if back <= 6:
-            grid[c][6 - back][t.hour] += 1
-        if age >= 7 * D:
+            grid[c][6 - back][t.hour] += n
+    for (source, age_h), n in tc["by_age"].items():
+        c = CHANNEL.get(source)
+        if not c or age_h >= 7 * 24:
             continue
-        d = int(age // D)                               # today_vs_usual stays on rolling 24 h windows
-        days[c][d] += 1
-        if age < D:
-            hourly[c][23 - int(age // H)] += 1
+        days[c][age_h // 24] += n                       # today_vs_usual stays on rolling 24 h windows
+        if age_h < 24:
+            hourly[c][23 - age_h] += n
     # Previous days count (zeros included) only where the store's history fully covers them.
-    oldest_age = max((now_ns - x["ts"] for x in events if x["ts"] <= now_ns), default=0)
+    oldest_age = now_ns - tc["oldest"] if tc["oldest"] is not None else 0
     covered = [d for d in range(1, 7) if (d + 1) * D <= oldest_age or (d == 6 and oldest_age >= 6 * D)]
     tvu = {}
     for c in chans:
