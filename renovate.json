@@ -59,7 +59,7 @@
       "ignoreTests": true
     },
     {
-      "description": "MANUAL tier: access/security-critical or stateful - only on explicit approval in the Dependency Dashboard",
+      "description": "MANUAL tier: access/security-critical or stateful - only on explicit approval in the Dependency Dashboard; once approved the PR automerges (no CI: ignoreTests) and is applied after the nightly backup",
       "matchPackageNames": [
         "traefik",
         "ghcr.io/tinyauthapp/tinyauth",
@@ -73,15 +73,21 @@
         "valkey/valkey"
       ],
       "dependencyDashboardApproval": true,
-      "automerge": false
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": false,
+      "ignoreTests": true
     },
     {
-      "description": "Majors are never automatic, for any tier",
+      "description": "Majors are never automatic, for any tier: Dependency Dashboard approval required; once approved the PR automerges (no CI: ignoreTests)",
       "matchUpdateTypes": [
         "major"
       ],
-      "automerge": false,
-      "dependencyDashboardApproval": true
+      "dependencyDashboardApproval": true,
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": false,
+      "ignoreTests": true
     },
     {
       "description": "linuxserver.io images: their tags carry -lsNNN build suffixes; treat them as versions",
