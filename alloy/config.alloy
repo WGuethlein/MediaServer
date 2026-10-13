@@ -85,6 +85,26 @@ loki.process "containers" {
     expression = "(\\x1b\\[[0-9;]*m)"
     replace    = ""
   }
+  // CrowdSec bans: "... by ip 1.2.3.4 (CC/ASN) : 4h ban on Ip 1.2.3.4" → attacker location for the attack map
+  stage.match {
+    selector = "{container=\"crowdsec\"} |= \" ban on Ip \""
+    stage.regex {
+      expression = " by ip (?P<src_ip>[0-9a-fA-F.:]+) \\("
+    }
+    stage.geoip {
+      source  = "src_ip"
+      db      = "/geoip/dbip-city-lite.mmdb"
+      db_type = "city"
+    }
+    stage.geoip {
+      source  = "src_ip"
+      db      = "/geoip/dbip-asn-lite.mmdb"
+      db_type = "asn"
+    }
+    stage.structured_metadata {
+      regex = "geoip_.*"
+    }
+  }
   forward_to = [loki.write.mon.receiver]
 }
 
@@ -117,6 +137,11 @@ loki.process "traefik" {
     source  = "src_ip"
     db      = "/geoip/dbip-city-lite.mmdb"
     db_type = "city"
+  }
+  stage.geoip {
+    source  = "src_ip"
+    db      = "/geoip/dbip-asn-lite.mmdb"
+    db_type = "asn"
   }
   stage.structured_metadata {
     regex = "geoip_.*"
@@ -152,6 +177,11 @@ loki.process "cowrie" {
     source  = "src_ip"
     db      = "/geoip/dbip-city-lite.mmdb"
     db_type = "city"
+  }
+  stage.geoip {
+    source  = "src_ip"
+    db      = "/geoip/dbip-asn-lite.mmdb"
+    db_type = "asn"
   }
   stage.structured_metadata {
     regex = "geoip_.*"

@@ -1,6 +1,7 @@
 # Attack feed — public, scrubbed live view of honeypot/firewall/scanner events. Added 2026-10-11.
-#  - attackfeed-gen: every 60 s queries Loki on wyatt-mon, writes feed.json (no home/LAN details).
-#  - attackfeed: nginx serving feed.json + live map at https://attacks.geet.dev/<token>/ (token: secrets/attackfeed_token)
+#  v2: incremental 7-day store, insights, sessions; docs/honeypot.md
+#  - attackfeed-gen: every 20 s queries Loki on wyatt-mon, writes feed/live/insights/sessions JSON (no home/LAN details).
+#  - attackfeed: nginx serving those + the page at https://attacks.geet.dev/<token>/ (token: secrets/attackfeed_token)
 services:
   attackfeed-gen:
     container_name: attackfeed-gen
@@ -14,18 +15,23 @@ services:
     mem_limit: 256m
     networks:
       - default           # reaches Loki at 192.168.1.73:3100
-    command: ["python3", "-u", "/app/attackfeed.py"]
+    command: ["python3", "-u", "-m", "attackfeed"]
+    working_dir: /app
     volumes:
-      - ${DOCKERDIR}/honeypot/attackfeed.py:/app/attackfeed.py:ro
+      - ${DOCKERDIR}/honeypot/attackfeed:/app/attackfeed:ro
       - ${DOCKERDIR}/honeypot/map.html:/app/map.html:ro
       - ${DOCKERDIR}/appdata/attackfeed:/out
+      - ${DOCKERDIR}/appdata/attackfeed-state:/state          # 7-day SQLite store; NOT served by nginx
+      - ${DOCKERDIR}/appdata/cowrie/var/lib/cowrie/tty:/tty:ro  # Cowrie session recordings
     secrets:
       - attackfeed_token
     environment:
       LOKI_URL: http://192.168.1.73:3100
       INTERVAL: "20"            # seconds between feed rebuilds (page polls every 15 s)
       TOKEN_FILE: /run/secrets/attackfeed_token
-      HOME_WAN_IP_SCRUB: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      MAX_EVENTS: "6000"
+      HISTORY_DAYS: "7"
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }

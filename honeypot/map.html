@@ -3,343 +3,900 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Live Attack Map</title>
 <meta name="robots" content="noindex,nofollow">
+<title>Decoy server logbook</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#070b12; --panel:#0e1522; --line:#1d2a3d; --text:#d7e2f0; --dim:#7f8ea3;
-          --ssh:#ff4d6d; --telnet:#ff9f1c; --blocked:#4cc9f0; --web:#b388ff; --ok:#2ee59d; }
+  /* Courier Prime: the printout and anything a machine typed. Libre Franklin: the sentences around it. */
+  :root { --paper:#F7F8F3; --band:#E5EEE1; --ink:#22262A; --ink2:#5B6166; --rule:#CDD3C9; --red:#B3261E; --hole:#D6DBD2; --shadow:rgba(34,38,42,.12); }
+  :root[data-theme="dark"] { --paper:#1A1B19; --band:#202923; --ink:#E4E2DA; --ink2:#9A9C94; --rule:#35382F; --red:#F0605A; --hole:#2C2F29; --shadow:rgba(0,0,0,.4); }
   * { box-sizing:border-box; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
-              font:14px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  header { display:flex; align-items:center; gap:24px; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  header h1 { font-size:16px; margin:0; letter-spacing:.08em; text-transform:uppercase; }
-  .live { display:inline-flex; align-items:center; gap:6px; color:var(--ok); font-size:12px; }
-  .live i { width:8px; height:8px; border-radius:50%; background:var(--ok); animation:pulse 1.6s infinite; }
-  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(46,229,157,.7)} 100%{box-shadow:0 0 0 10px rgba(46,229,157,0)} }
-  .kpis { display:flex; gap:22px; margin-left:auto; flex-wrap:wrap; }
-  .kpi b { display:block; font-size:20px; font-variant-numeric:tabular-nums; }
-  .kpi span { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
-  main { display:grid; grid-template-columns:1fr 340px; height:calc(100% - 58px); }
-  #mapwrap { position:relative; }
-  #map { position:absolute; inset:0; background:var(--bg); }
-  .mapbtns { position:absolute; top:10px; left:10px; z-index:2; display:flex; gap:6px; }
-  .mapbtns button { background:rgba(14,21,34,.85); color:var(--text); border:1px solid var(--line); border-radius:6px;
-                    padding:5px 10px; font:12px ui-sans-serif,system-ui,sans-serif; cursor:pointer; }
-  .mapbtns button[aria-pressed="true"] { border-color:var(--blocked); color:var(--blocked); }
-  aside { border-left:1px solid var(--line); overflow:auto; padding:12px; display:flex; flex-direction:column; gap:14px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
-  .card h2 { font-size:11px; margin:0 0 8px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; }
-  .bar { display:grid; grid-template-columns:1fr auto; gap:8px; font-size:13px; padding:2px 0; position:relative; }
-  .bar::before { content:""; position:absolute; inset:0 auto 0 0; width:var(--w); background:rgba(76,201,240,.12); border-radius:3px; }
-  .bar > * { position:relative; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .bar code { font-family:ui-monospace,Consolas,monospace; font-size:12px; }
-  #feed { font-family:ui-monospace,Consolas,monospace; font-size:12px; max-height:340px; overflow:auto; }
-  #feed div { padding:3px 0; border-bottom:1px solid var(--line); animation:fadein .6s; }
-  @keyframes fadein { from{background:rgba(255,77,109,.25)} to{background:transparent} }
-  .tag { display:inline-block; min-width:62px; font-size:10px; text-transform:uppercase; }
-  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--dim); }
-  .legend i { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:-1px; }
-  .maplibregl-popup-content { background:var(--panel); color:var(--text); border:1px solid var(--line); padding:6px 10px; font-size:12px; }
-  .maplibregl-popup-tip { display:none; }
-  .maplibregl-ctrl-attrib { background:rgba(7,11,18,.7)!important; color:var(--dim)!important; }
-  .maplibregl-ctrl-attrib a { color:var(--dim)!important; }
-  @media (max-width:800px){ main{grid-template-columns:1fr; grid-template-rows:60vh auto; height:auto} aside{border-left:0} }
+  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font:14px/1.45 "Libre Franklin",sans-serif; }
+  button { font:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  code, .mono { font-family:"Courier Prime",monospace; }
+  .page { display:grid; grid-template-rows:auto minmax(0,1fr) auto; height:100%; }
+  header { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:24px; align-items:end; padding:18px 24px 12px; border-bottom:1px solid var(--rule); }
+  h1 { font-size:27px; line-height:1.15; margin:0; font-weight:700; letter-spacing:-.015em; max-width:34ch; }
+  .deck { margin:6px 0 0; color:var(--ink2); max-width:86ch; }
+  .deck b { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+  .meta { text-align:right; font-size:12.5px; color:var(--ink2); }
+  .meta .row { display:flex; gap:14px; justify-content:flex-end; align-items:center; }
+  .meta .clock { font:700 15px "Courier Prime",monospace; color:var(--ink); }
+  .theme { border:1px solid var(--rule); background:none; padding:2px 9px; cursor:pointer; }
+  .filters { margin-top:6px; display:flex; gap:4px 12px; justify-content:flex-end; flex-wrap:wrap; max-width:520px; margin-left:auto; }
+  .filters label { cursor:pointer; user-select:none; display:inline-flex; gap:5px; align-items:center; color:var(--ink); }
+  .filters input { accent-color:var(--ink); margin:0; }
+  .sw { display:inline-block; width:14px; height:0; border-top:2px solid; vertical-align:middle; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 460px; min-height:0; }
+  .left { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; min-width:0; border-right:1px solid var(--rule); }
+  #map { position:relative; min-height:300px; }
+  .maplibregl-ctrl-attrib { background:color-mix(in srgb, var(--paper) 80%, transparent)!important; color:var(--ink2)!important; font-size:10px; }
+  .maplibregl-ctrl-attrib a { color:var(--ink2)!important; }
+  .hint { position:absolute; right:12px; top:10px; z-index:2; color:var(--ink2); font-size:12px; background:color-mix(in srgb, var(--paper) 85%, transparent); padding:2px 6px; pointer-events:none; }
+  .nomap { position:absolute; inset:0; display:grid; place-items:center; color:var(--ink2); padding:24px; text-align:center; }
+
+  /* the desk: tabs under the map */
+  .desk { border-top:1px solid var(--rule); height:clamp(270px, 38vh, 400px); display:grid; grid-template-rows:auto minmax(0,1fr); min-width:0; }
+  .tabs { display:flex; gap:2px 18px; align-items:baseline; flex-wrap:wrap; padding:8px 20px 0; border-bottom:1px solid var(--rule); }
+  .tabs [role=tab] { border:0; border-bottom:2px solid transparent; background:none; padding:2px 0 6px; cursor:pointer; color:var(--ink2); font-weight:600; font-size:13px; }
+  .tabs [role=tab][aria-selected=true] { color:var(--ink); border-bottom-color:var(--ink); }
+  .tabs [role=tab].empty { font-weight:400; }
+  .pin { margin-left:auto; border:1px solid var(--rule); background:none; padding:0 8px; font-size:12px; color:var(--ink2); cursor:pointer; }
+  .pin[hidden] { display:none; }
+  .panel { overflow:auto; padding:10px 20px 14px; min-height:0; }
+  .panel.sess { display:flex; flex-direction:column; overflow:hidden; }
+  .lede { margin:0 0 8px; max-width:78ch; }
+  .note { color:var(--ink2); margin:0 0 8px; max-width:78ch; }
+  .cap { color:var(--ink2); margin:0 0 8px; max-width:78ch; }
+  .cap b, .cap code { color:var(--ink); }
+  .tty { font:12.5px/1.5 "Courier Prime",monospace; white-space:pre-wrap; overflow-wrap:anywhere; flex:1; min-height:6em; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; }
+  .tty div { flex:none; }
+  .tty .o { color:var(--ink2); }
+  .tty .bad { color:var(--red); }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:10px 28px; }
+  .grid2 h3, .sub h3 { font-size:13px; margin:0 0 2px; font-weight:700; }
+  .grid2 section { min-width:0; }
+  dl.kv { display:grid; grid-template-columns:auto auto; justify-content:start; gap:1px 14px; margin:0; font-variant-numeric:tabular-nums; }
+  dl.kv dt { color:var(--ink2); }
+  dl.kv dd { margin:0; text-align:right; }
+  .lst { margin:0; padding:0; list-style:none; }
+  .lst li { overflow-wrap:anywhere; }
+  .lst .n { color:var(--ink2); font-variant-numeric:tabular-nums; }
+  .lst code { font-size:13px; }
+  .link { border:0; background:none; padding:0; cursor:pointer; text-decoration:underline; text-decoration-color:var(--rule); text-underline-offset:2px; text-align:left; }
+  .link:hover { text-decoration-color:var(--ink); }
+  .rows { margin:0; padding:0; list-style:none; }
+  .rows > li { border-top:1px solid var(--rule); }
+  .rows > li:first-child { border-top:0; }
+  .rowbtn { display:block; width:100%; text-align:left; border:0; background:none; padding:6px 0; cursor:pointer; }
+  .rowbtn.sel, .rows > li.sel { background:var(--band); }
+  .rowbtn .t1 { display:block; overflow-wrap:anywhere; }
+  .rowbtn .t2, .rows .t2 { display:block; color:var(--ink2); }
+  .rows > li.mal { padding:6px 0; overflow-wrap:anywhere; }
+  .rows a { color:var(--ink); }
+  .heat { display:grid; grid-template-columns:auto repeat(24, minmax(0,1fr)); gap:1px; margin:3px 0 10px; font-size:11px; color:var(--ink2); }
+  .heat i { display:block; height:.62em; background:var(--ink); align-self:center; }
+  .heat span { line-height:.9; white-space:nowrap; padding-right:6px; }
+  .heat .hr { grid-column:span 6; font-variant-numeric:tabular-nums; }
+  .chan { margin-top:6px; max-width:780px; }
+  .chan p { margin:0; }
+  .sub { margin-top:10px; max-width:78ch; }
+  .sub p { margin:2px 0; }
+
+  /* the printout: line height in em so it holds at any zoom and any minimum font size */
+  .printout { position:relative; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .printout h2 { font-size:13px; margin:0; padding:10px 16px 8px 30px; font-weight:700; border-bottom:1px solid var(--rule); }
+  .printout h2 span { font-weight:400; color:var(--ink2); margin-left:6px; }
+  .roll { flex:1; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; padding-left:26px; position:relative;
+          font:12.5px/1.5 "Courier Prime",monospace; }
+  .roll::before { content:""; position:absolute; left:7px; top:0; bottom:0; width:10px;
+          background:radial-gradient(circle, var(--hole) 2.8px, transparent 3.2px) 0 0/10px 1.5em; }
+  .roll button { display:block; width:100%; flex:none; margin:0; border:0; padding:0 12px 0 0; background:none; text-align:left;
+          font:inherit; line-height:inherit; white-space:pre; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  .roll button:focus-visible { outline-offset:-2px; }
+  .roll .b { background:var(--band); }
+  .roll .r { color:var(--red); }
+  .roll .dim { color:var(--ink2); }
+  .roll.h-blocked [data-k=blocked], .roll.h-ips [data-k=ips], .roll.h-web [data-k=web], .roll.h-crowdsec [data-k=crowdsec],
+  .roll.h-ssh [data-k=ssh], .roll.h-telnet [data-k=telnet], .roll.h-success [data-k=success] { display:none; }
+  footer { border-top:1px solid var(--rule); padding:5px 24px; font-size:11.5px; color:var(--ink2); }
+
+  @media (max-width:900px) {
+    .page { height:auto; display:block; }
+    html,body { height:auto; }
+    header { grid-template-columns:1fr; padding:14px 16px 10px; gap:10px; }
+    h1 { font-size:22px; }
+    .meta { text-align:left; }
+    .meta .row, .filters { justify-content:flex-start; margin-left:0; }
+    main { grid-template-columns:minmax(0,1fr); }
+    .left { border-right:0; display:block; }
+    #map { height:55vh; }
+    .desk { height:auto; display:block; }
+    .tabs { padding:8px 16px 0; }
+    .panel { padding:10px 16px 14px; }
+    .panel.sess { overflow:visible; }
+    .tty { flex:none; height:12em; }
+    .printout { height:420px; border-top:1px solid var(--rule); }
+    footer { padding:6px 16px; }
+  }
 </style>
+<script>
+  // theme before first paint: saved choice, else the system setting
+  (() => { let t = null; try { t = localStorage.getItem("am-theme"); } catch (e) {}
+           if (t !== "dark" && t !== "light") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+           document.documentElement.dataset.theme = t; })();
+</script>
 </head>
 <body>
+<div class="page">
 <header>
-  <h1>Live Attack Map</h1>
-  <span class="live"><i></i><span id="updated">connecting…</span></span>
-  <div class="kpis">
-    <div class="kpi"><b id="k-total">–</b><span>events (24h)</span></div>
-    <div class="kpi"><b id="k-src">–</b><span>unique attackers</span></div>
-    <div class="kpi"><b id="k-cc">–</b><span>countries</span></div>
-    <div class="kpi"><b id="k-login">–</b><span>login attempts</span></div>
+  <div>
+    <h1 id="headline">Connecting to the decoy server…</h1>
+    <p class="deck" id="deck"></p>
+  </div>
+  <div class="meta">
+    <div class="row"><span><span id="status" role="status">connecting…</span><span id="updated"></span></span><button class="theme" id="theme" type="button"></button></div>
+    <div class="clock" id="clock">--:--:-- UTC</div>
+    <div class="filters" id="filters" aria-label="Show or hide kinds of event"></div>
   </div>
 </header>
 <main>
-  <div id="mapwrap">
-    <div id="map"></div>
-    <div class="mapbtns">
-      <button id="btn-globe" aria-pressed="false" title="Toggle globe / flat map">Globe</button>
-      <button id="btn-home" title="Back to the default view">Reset view</button>
-      <button id="btn-hist" aria-pressed="true" title="Replay recent history as faint arcs while waiting for live attacks">History</button>
-    </div>
+  <div class="left">
+    <div id="map"><div class="hint">Click a dot for the machine behind it</div></div>
+    <section class="desk" aria-label="About the data">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="panel" id="panel" role="tabpanel"><p class="note">Waiting for the first data…</p></div>
+    </section>
   </div>
-  <aside>
-    <div class="card legend">
-      <span><i style="background:var(--ssh)"></i>SSH honeypot</span>
-      <span><i style="background:var(--telnet)"></i>Telnet honeypot</span>
-      <span><i style="background:var(--blocked)"></i>Blocked at firewall</span>
-      <span><i style="background:var(--web)"></i>Web scanner</span>
-    </div>
-    <div class="card"><h2>Live feed</h2><div id="feed"></div></div>
-    <div class="card"><h2>Top countries</h2><div id="t-countries"></div></div>
-    <div class="card"><h2>Most targeted ports</h2><div id="t-ports"></div></div>
-    <div class="card"><h2>Usernames tried</h2><div id="t-users"></div></div>
-    <div class="card"><h2>Passwords tried</h2><div id="t-pass"></div></div>
-    <div class="card"><h2>Commands run (fake shell)</h2><div id="t-cmds"></div></div>
-  </aside>
+  <section class="printout" aria-label="Logbook">
+    <h2>Logbook <span>every event as it arrives, newest at the bottom</span></h2>
+    <div class="roll" id="roll"></div>
+  </section>
 </main>
+<footer>IP geolocation and network owners: DB-IP (CC BY 4.0). Map: OpenFreeMap, OpenMapTiles, OpenStreetMap. Global baseline: SANS ISC / DShield.</footer>
+</div>
 <script>
-// Target = Columbus, Ohio ([lng, lat] — MapLibre order).
-const TARGET = [-82.999, 39.961];
-const HOME_VIEW = { center: [-60, 30], zoom: 1.6 };
-const POLL_MS = 15000;
-// Live events play at their real time + LAG (covers Loki ingest + 20 s feed rebuild + 15 s poll),
-// so they come out as a steady stream instead of a burst per poll.
-const LAG_MS = 75000;
-// Ambient replay: when nothing live is playing, re-play a random real event from the last 24 h as a
-// faint arc (no impact flash, no feed line) so a wall display never looks dead.
-const AMBIENT_EVERY_MS = 1100;
-const COLORS = { ssh: "#ff4d6d", telnet: "#ff9f1c", blocked: "#4cc9f0", web: "#b388ff" };
+"use strict";
+// ------------------------------------------------------------------ constants
+const TARGET = [-82.999, 39.961];                 // Columbus, Ohio ([lng, lat]); the city, not the house
+const LAG_MS = 75000;                             // live events play at real time + 75 s (ingest + rebuild + poll)
+const LIVE_MS = 15000, INSIGHTS_MS = 60000, FEED_MS = 600000;
+const AMBIENT_MS = 1100;                          // no live arc for this long -> replay a recent event faintly
+const TOUR_MS = 40000;
+const REDUCED = /[?&]reduced=1(&|$)/.test(location.search) || matchMedia("(prefers-reduced-motion: reduce)").matches;
+const KINDS = ["blocked", "ips", "web", "crowdsec", "ssh", "telnet", "success"];
+const THEMES = {
+  light: { land:"#E7E9E1", water:"#F7F8F3", border:"#C5CBC0", label:"#9AA096", target:"#22262A",
+           kind:{ blocked:"#A3A9A0", ips:"#7C6A9C", web:"#6C7886", crowdsec:"#3F7A72", ssh:"#22262A", telnet:"#6B5541", success:"#B3261E" } },
+  dark:  { land:"#262823", water:"#1A1B19", border:"#3B3E37", label:"#5E625A", target:"#E4E2DA",
+           kind:{ blocked:"#6B6F68", ips:"#A898C4", web:"#8EA0B5", crowdsec:"#7FB3A9", ssh:"#E4E2DA", telnet:"#C8A27C", success:"#F0605A" } },
+};
+const SHORT = { blocked:"Firewall", ips:"IPS", web:"Web scanners", crowdsec:"CrowdSec", ssh:"SSH", telnet:"Telnet", success:"Got in" };
+const NAMES = { blocked:"Blocked at the firewall", ips:"Intrusion-prevention alerts", web:"Web scanner requests", crowdsec:"CrowdSec bans",
+                ssh:"SSH decoy", telnet:"Telnet decoy", success:"Inside the fake shell" };
+const VERDICT = {
+  "research scanner": "A known research or search-engine scanner that maps the whole internet. Noisy, not hostile on its own.",
+  "hands-on": "Typed slowly or ran unusual commands, which points to a person at a keyboard rather than a script.",
+  "dropper": "Tried to download and run a program, usually malware that adds the machine to a botnet.",
+  "password bot": "Only tried logins from a password list and never ran anything.",
+  "port scanner": "Only knocked on ports and was blocked; it is mapping what answers.",
+  "web scanner": "Only requested web pages, looking for known weak software and leaked files.",
+  "mixed": "Did several different things that fit no single pattern.",
+};
+const BAD = /wget|curl|tftp|ftpget|authorized_keys|chpasswd|\/dev\/tcp/;
+const SID = /^[0-9a-f]{8,32}$/;
+const TABS = ["session", "attacker", "campaigns", "trends", "malware"];
+const TAB_LABEL = { session:"Session", attacker:"Attacker", campaigns:"Campaigns", trends:"Trends", malware:"Malware" };
+const CHANNELS = [["honeypot", "The SSH and Telnet decoy"], ["firewall", "Firewall blocks"], ["ips", "Intrusion-prevention alerts"],
+                  ["web", "Web scanner requests"], ["crowdsec", "CrowdSec bans"]];
 
-const kind = e => e.source === "cowrie" ? (e.proto === "telnet" ? "telnet" : "ssh") : e.source === "firewall" ? "blocked" : "web";
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const key = e => `${e.t}|${e.src}|${e.type}|${e.user ?? ""}|${e.cmd ?? ""}|${e.path ?? ""}`;
+// ------------------------------------------------------------------ helpers
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+const fmt = n => Number(n || 0).toLocaleString("en-US");
+const col = (s, n) => String(s ?? "").padEnd(n).slice(0, n);
+const theme = () => document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+const C = () => THEMES[theme()];
+const kindOf = e => e.kind && KINDS.includes(e.kind) ? e.kind
+  : e.source === "firewall" ? "blocked" : ["ips", "crowdsec", "web"].includes(e.source) ? e.source
+  : ["login-success", "command", "download"].includes(e.type) ? "success" : e.proto === "telnet" ? "telnet" : "ssh";
+const evKey = e => [e.t, e.src, e.type, e.session, e.user, e.cmd, e.path, e.sig].map(v => v ?? "").join("|");
+const hhmm = iso => new Date(iso).toISOString().slice(11, 16);
+const dateShort = iso => new Date(iso).toLocaleDateString("en-US", { month:"short", day:"numeric", timeZone:"UTC" });
+const plural = (n, w, ws) => `${fmt(n)} ${n === 1 ? w : (ws || w + "s")}`;
+function ago(iso) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (!isFinite(s)) return "at an unknown time";
+  if (s < 90) return "just now";
+  if (s < 5400) return `${Math.round(s / 60)} min ago`;
+  if (s < 129600) return `${Math.round(s / 3600)} h ago`;
+  return `${Math.round(s / 86400)} days ago`;
+}
+function orgShort(o) {
+  let s = String(o || "").trim(), prev;
+  do { prev = s; s = s.replace(/,?\s+(LLC|L\.L\.C\.|Inc\.?|Ltd\.?|Limited|GmbH|SAS|S\.A\.S\.|B\.V\.|BV|Co\.?|Corp\.?|Corporation|AB|AG|SRL|S\.R\.L\.|LTD|OOO|s\.r\.o\.)$/i, "").trim(); } while (s !== prev);
+  return s;
+}
+const andList = a => a.length < 2 ? (a[0] || "") : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`;
+function secs(d) {
+  d = Math.round(Number(d) || 0);
+  return d < 90 ? `${d} s` : d < 5400 ? `${Math.round(d / 60)} min` : `${(d / 3600).toFixed(1)} h`;
+}
+function times(r) {                                // today vs usual, as words
+  if (r == null || !isFinite(r)) return null;
+  if (r >= 0.75 && r <= 1.33) return "a normal day";
+  if (r > 1.33) return `about ${r < 2 ? r.toFixed(1) : Math.round(r)}× a normal day`;
+  return `quieter than usual, about ${Math.round(r * 100)}% of a normal day`;
+}
 
-// ---------------------------------------------------------------- map
-// OpenFreeMap: free vector tiles, no API key, no registration (https://openfreemap.org).
-const map = new maplibregl.Map({
-  container: "map",
-  style: "https://tiles.openfreemap.org/styles/dark",
-  ...HOME_VIEW,
-  minZoom: 0.8,
-  maxZoom: 12,
-  attributionControl: { compact: true, customAttribution: 'IP geolocation <a href="https://db-ip.com">DB-IP</a>' },
+// ------------------------------------------------------------------ state
+const S = { feed:null, ins:null, live:[], seen:new Set(), queue:[], hidden:new Set(), primed:false,
+            lastOk:Date.now(), lastGen:null, everOk:false, failing:false };
+
+// ------------------------------------------------------------------ header: status, clock, theme, filters
+// the live region announces state changes only; the ticking timestamp sits beside it, outside the region
+function setStatus(t, updated = "") {
+  if ($("status").textContent !== t) $("status").textContent = t;
+  $("updated").textContent = updated;
+}
+function refreshStatus() {
+  if (S.failing) return setStatus(S.everOk ? "reconnecting" : "connecting…");
+  if (!S.lastGen) return setStatus("connecting…");
+  if (S.feed && !S.feed.events.length) return setStatus("no data yet");
+  if (Date.now() - Date.parse(S.lastGen) > 3 * 60000) return setStatus(`stale: last update ${hhmm(S.lastGen)} UTC`);
+  setStatus("live", `, updated ${new Date(S.lastGen).toISOString().slice(11, 19)} UTC`);
+}
+setInterval(() => { $("clock").textContent = new Date().toISOString().slice(11, 19) + " UTC"; }, 1000);
+setInterval(refreshStatus, 10000);
+
+function drawFilters() {
+  $("filters").innerHTML = KINDS.map(k => `<label><input type="checkbox" data-k="${k}" ${S.hidden.has(k) ? "" : "checked"}>` +
+    `<span class="sw" style="border-color:${C().kind[k]}"></span>${SHORT[k]}</label>`).join("");
+  $("filters").querySelectorAll("input").forEach(i => i.onchange = () => {
+    i.checked ? S.hidden.delete(i.dataset.k) : S.hidden.add(i.dataset.k);
+    $("roll").classList.toggle("h-" + i.dataset.k, !i.checked);
+    for (let j = arcs.length - 1; j >= 0; j--) if (S.hidden.has(arcs[j].k)) arcs.splice(j, 1);
+    pushPoints(); trailsDirty = true; idlePushed = false;
+  });
+}
+function themeLabel() { $("theme").textContent = theme() === "dark" ? "Light" : "Dark"; }
+$("theme").onclick = () => {
+  const next = theme() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("am-theme", next); } catch (e) {}
+  themeLabel(); drawFilters(); setMapColors();
+};
+themeLabel(); drawFilters();
+
+function renderHeader() {
+  const f = S.feed; if (!f) return;
+  const s = f.stats || {}, bs = s.by_source || {};
+  if (!f.events.length) {
+    $("headline").textContent = "No attempts on the decoy server in the last 24 hours yet.";
+    $("deck").textContent = "The page fills in as soon as the first event arrives.";
+    return;
+  }
+  // machines, never an event count: login-success sources in the feed, else profiles that reached the shell
+  const gotIn = new Set(f.events.filter(e => e.type === "login-success").map(e => e.src)).size ||
+    Object.values(S.ins?.profiles || {}).filter(p => p.kinds?.success).length;
+  $("headline").textContent = `${fmt(s.total)} attempts on a decoy server in the last 24 hours. ` +
+    (gotIn ? `${plural(gotIn, "bot")} got into its fake shell.` : "None of them got into its fake shell.");
+  const parts = [[bs.firewall, "port scans stopped at the firewall"], [bs.ips, "intrusion-prevention alerts"],
+                 [bs.cowrie, "connections and login attempts on the SSH and Telnet decoy"], [bs.web, "web scanner requests"],
+                 [bs.crowdsec, "CrowdSec bans"]].filter(p => p[0]).map(p => `<b>${fmt(p[0])}</b> ${p[1]}`);
+  let d = parts.length ? `Most of it is automated: ${andList(parts)}. ` : "";
+  const top = (s.top_countries || [])[0];
+  if (top && s.total) d += `${esc(top.value)} sent ${Math.round(top.count / s.total * 100)}% of it. `;
+  const tvu = times(S.ins?.trends?.today_vs_usual?.honeypot);
+  if (tvu) d += `For the decoy, today is ${tvu}. `;
+  d += "Locations are of the connecting machines, not the people behind them; events show up about 75 s after they happen, and the target point is the city, not the house.";
+  $("deck").innerHTML = d;
+}
+
+// ------------------------------------------------------------------ printout
+const roll = $("roll");
+let lineNo = 0, fold = null;
+function newLine(html, e, k) {
+  const b = document.createElement("button");
+  b.type = "button";
+  if (Math.floor(lineNo++ / 2) % 2) b.className = "b";            // greenbar bands of two lines travel with the paper
+  b.dataset.ip = e.src || ""; b.dataset.k = k; b.innerHTML = html; b.title = b.textContent;
+  roll.appendChild(b);
+  while (roll.childElementCount > 90) roll.firstChild.remove();
+  return b;
+}
+roll.addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-ip]");
+  if (b && b.dataset.ip) userSelect("attacker", { ip: b.dataset.ip });
 });
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+function print(e) {
+  const k = kindOf(e), t = String(e.t).slice(11, 19), place = `${esc(col(e.cc, 2))} ${esc(col(e.city, 12))}`;
+  const ts = Date.parse(e.t);
+  if (k === "blocked") {
+    const pp = `${esc(e.proto || "?")}/${esc(e.port ?? "?")}`;
+    if (fold && fold.place === place && Math.abs(ts - fold.last) < 90000 && fold.el === roll.lastChild) {
+      fold.n++; fold.last = ts; fold.el.dataset.ip = e.src || "";
+      fold.el.innerHTML = `${fold.t}  ${place}  <span class="dim">blocked ${fold.n} ports, latest ${pp}</span>`;
+      fold.el.title = fold.el.textContent;
+      return;
+    }
+    fold = { place, t, last: ts, n: 1 };
+    fold.el = newLine(`${t}  ${place}  <span class="dim">blocked ${pp}</span>`, e, k);
+    return;
+  }
+  const p = esc(col(e.proto, 6));
+  let what;
+  if (k === "ips") what = `ips  ${esc(e.sig || "alert")}`;
+  else if (k === "crowdsec") what = `ban  ${esc(e.scenario || "")}`;
+  else if (k === "web") what = `web  ${esc(e.method)} ${esc(e.path)}`;
+  else if (e.type === "connect") what = `${p} connect`;
+  else if (e.type === "login-failed") what = `${p} ${esc(e.user)} / ${esc(e.pass)}  refused`;
+  else if (e.type === "login-success") what = `${p} ${esc(e.user)} / ${esc(e.pass)}  <span class="r">accepted</span>`;
+  else if (e.type === "command") what = BAD.test(e.cmd || "") ? `<span class="r">$ ${esc(e.cmd)}</span>` : `$ ${esc(e.cmd)}`;
+  else if (e.type === "download") what = `<span class="r">download ${esc(e.url)}</span>`;
+  else if (e.type === "client") what = `<span class="dim">${p} client ${esc(e.client || "")}</span>`;
+  else if (e.type === "closed") what = `<span class="dim">${p} closed${e.duration != null ? ` after ${esc(secs(e.duration))}` : ""}</span>`;
+  else if (e.type === "tcpip") what = `<span class="dim">${p} tunnel to ${esc(e.url || "?")}:${esc(e.port ?? "?")}</span>`;
+  else what = esc(e.type);
+  fold = null;
+  newLine(`${t}  ${place}  ${what}`, e, k);
+}
 
-const empty = () => ({ type: "FeatureCollection", features: [] });
-const arcs = [];            // active animations: {coords, color, start, dur}
-let animating = false;
+// ------------------------------------------------------------------ map
+let map = null, mapReady = false;
+const arcs = [], trails = new Map(), gcCache = new Map();
+let trailsDirty = false, idlePushed = false, lastPush = 0, lastLive = 0, burst = 0, burstAt = 0, trailDay = new Date().getUTCDate();
+const fc = f => ({ type: "FeatureCollection", features: f });
 
-// Great-circle path from a to b ([lng,lat]), longitudes unwrapped so it never jumps at ±180°.
-function greatCircle(a, b, n = 96) {
-  const rad = Math.PI / 180, deg = 180 / Math.PI;
-  const [l1, p1, l2, p2] = [a[0] * rad, a[1] * rad, b[0] * rad, b[1] * rad];
+function greatCircle(a, b, n = 72) {
+  const r = Math.PI / 180, d2 = 180 / Math.PI;
+  const [l1, p1, l2, p2] = [a[0] * r, a[1] * r, b[0] * r, b[1] * r];
   const d = 2 * Math.asin(Math.sqrt(Math.sin((p2 - p1) / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin((l2 - l1) / 2) ** 2));
-  if (d === 0) return [a, b];
-  const pts = [];
-  let prev = null;
+  if (!d) return [a, b];
+  const pts = []; let prev = null;
   for (let i = 0; i <= n; i++) {
     const f = i / n, A = Math.sin((1 - f) * d) / Math.sin(d), B = Math.sin(f * d) / Math.sin(d);
     const x = A * Math.cos(p1) * Math.cos(l1) + B * Math.cos(p2) * Math.cos(l2);
     const y = A * Math.cos(p1) * Math.sin(l1) + B * Math.cos(p2) * Math.sin(l2);
     const z = A * Math.sin(p1) + B * Math.sin(p2);
-    let lng = Math.atan2(y, x) * deg;
-    const lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * deg;
+    let lng = Math.atan2(y, x) * d2; const lat = Math.atan2(z, Math.hypot(x, y)) * d2;
     if (prev !== null) { while (lng - prev > 180) lng -= 360; while (lng - prev < -180) lng += 360; }
     pts.push([lng, lat]); prev = lng;
   }
   return pts;
 }
+function gc(e) {
+  const k = `${e.lat},${e.lon}`;
+  let c = gcCache.get(k);
+  if (!c) { c = greatCircle([e.lon, e.lat], TARGET); if (gcCache.size > 4000) gcCache.clear(); gcCache.set(k, c); }
+  return c;
+}
+const hasGeo = e => typeof e.lat === "number" && typeof e.lon === "number";
 
-// Animation loop. Never allowed to die: errors are caught and counted, and map data is pushed
-// at most ~30x/s and only while something is moving (pushing GeoJSON every frame can back up
-// MapLibre's worker over time).
-let lastPush = 0, lastPulse = 0, loopErrors = 0, idlePushed = false;
+function baseStyle(c) {
+  return { version: 8, glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+    sources: { omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" } },
+    layers: [
+      { id: "land", type: "background", paint: { "background-color": c.land } },
+      { id: "water", type: "fill", source: "omt", "source-layer": "water", paint: { "fill-color": c.water } },
+      { id: "border", type: "line", source: "omt", "source-layer": "boundary",
+        filter: ["all", ["==", ["get", "admin_level"], 2], ["!=", ["get", "maritime"], 1]],
+        paint: { "line-color": c.border, "line-width": 0.6 } },
+      { id: "country", type: "symbol", source: "omt", "source-layer": "place", filter: ["==", ["get", "class"], "country"],
+        layout: { "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]], "text-font": ["Noto Sans Regular"], "text-size": 10 },
+        paint: { "text-color": c.label, "text-halo-color": c.land, "text-halo-width": 1 } },
+    ] };
+}
+
+function pointsFC() {
+  const L = S.ins?.locations || [], c = C();
+  return fc(L.map(l => {
+    const vis = Object.entries(l.kinds || {}).filter(([k]) => !S.hidden.has(k));
+    const n = vis.reduce((a, [, v]) => a + v, 0);
+    if (!n || typeof l.lat !== "number") return null;
+    const top = vis.sort((a, b) => b[1] - a[1])[0][0];
+    const k = vis.some(([kk]) => kk === "success") ? "success" : top;
+    return { type: "Feature", geometry: { type: "Point", coordinates: [l.lon, l.lat] },
+             properties: { n, color: c.kind[k] || c.kind.blocked, src: l.top_src || "", key: `${l.lat},${l.lon}` } };
+  }).filter(Boolean));
+}
+function pushPoints() { if (mapReady) map.getSource("points").setData(pointsFC()); }
+function trailsFC() {
+  const c = C();
+  return fc([...trails.values()].filter(t => !S.hidden.has(t.k)).map(t =>
+    ({ type: "Feature", properties: { color: c.kind[t.k] }, geometry: { type: "LineString", coordinates: t.c } })));
+}
+function addTrail(e, k) {
+  if (REDUCED || !hasGeo(e)) return;
+  const key = `${e.lat},${e.lon},${k}`;
+  if (trails.has(key)) return;
+  if (trails.size >= 1500) trails.delete(trails.keys().next().value);
+  trails.set(key, { c: gc(e), k }); trailsDirty = true;
+}
+function seedTrails() {                          // everything since UTC midnight, so a reload keeps the day's trails
+  if (REDUCED || !S.feed) return;
+  const mid = new Date(); mid.setUTCHours(0, 0, 0, 0);
+  for (const e of S.feed.events) if (Date.parse(e.t) >= +mid && Date.parse(e.t) <= Date.now() - LAG_MS) addTrail(e, kindOf(e));
+}
+function setMapColors() {
+  if (!mapReady) return;
+  const c = C(), P = (l, k, v) => map.getLayer(l) && map.setPaintProperty(l, k, v);
+  P("land", "background-color", c.land); P("water", "fill-color", c.water); P("border", "line-color", c.border);
+  P("country", "text-color", c.label); P("country", "text-halo-color", c.land);
+  P("target", "circle-color", c.target); P("target", "circle-stroke-color", c.land);
+  P("target-label", "text-color", c.target); P("target-label", "text-halo-color", c.land);
+  P("points", "circle-stroke-color", c.land);
+  pushPoints(); trailsDirty = true; idlePushed = false;
+}
+
+function fire(e, ambient) {
+  if (REDUCED || !mapReady || document.hidden || !hasGeo(e)) return;
+  const k = kindOf(e);
+  if (S.hidden.has(k)) return;
+  const now = performance.now();
+  if (!ambient) {
+    lastLive = now;
+    if (now - burstAt > 400) { burst = 0; burstAt = now; }
+    if (++burst > 5) return;                      // cap arcs in bursts; the printout still gets every line
+  }
+  if (arcs.length > 80) return;
+  const st = ambient ? { w: 1, op: 0.35, dur: 2600 } : k === "blocked" ? { w: 0.9, op: 0.7 } : k === "success" ? { w: 1.8, op: 1, dur: 2300 } : { w: 1.3, op: 0.9 };
+  arcs.push({ c: gc(e), e, k, start: now, dur: st.dur || 1900, w: st.w, op: st.op, ambient });
+}
+
+// Animation loop. Never allowed to die: errors are caught and logged, map data is pushed at most ~30x/s
+// and only while something moves (pushing GeoJSON every frame can back up MapLibre's worker over time).
 function frame(now) {
   try {
+    const day = new Date().getUTCDate();
+    if (day !== trailDay) { trailDay = day; trails.clear(); trailsDirty = true; }      // trails last until UTC midnight
     if (now - lastPush >= 33) {
       lastPush = now;
-      const lines = [], heads = [];
-      for (let i = arcs.length - 1; i >= 0; i--) {
-        const a = arcs[i], t = (now - a.start) / a.dur;
-        if (t >= 1.6 || t < 0) { arcs.splice(i, 1); continue; }
-        const grow = Math.min(t, 1), fade = t <= 1 ? 1 : 1 - (t - 1) / 0.6;
-        const n = Math.max(2, Math.ceil(grow * (a.coords.length - 1)) + 1);
-        lines.push({ type: "Feature", properties: { color: a.color, op: (a.ambient ? 0.35 : 0.95) * fade, w: a.ambient ? 1.2 : 2.4 },
-                     geometry: { type: "LineString", coordinates: a.coords.slice(Math.max(0, n - 40), n) } });
-        heads.push(t <= 1
-          ? { type: "Feature", properties: { color: a.color }, geometry: { type: "Point", coordinates: a.coords[n - 1] } }
-          : a.ambient ? null
-          : { type: "Feature", properties: { color: a.color, impact: 1 - (t - 1) / 0.6 }, geometry: { type: "Point", coordinates: TARGET } });
+      const lines = [], heads = [], c = C();
+      for (let j = arcs.length - 1; j >= 0; j--) {
+        const a = arcs[j], t = (now - a.start) / a.dur;
+        if (t >= 1.5 || t < 0) { arcs.splice(j, 1); continue; }
+        if (t >= 1 && !a.done) { a.done = true; if (!a.ambient) addTrail(a.e, a.k); }
+        const g = Math.min(t, 1), fade = t <= 1 ? 1 : 1 - (t - 1) / 0.5, n = Math.max(2, Math.ceil(g * (a.c.length - 1)) + 1);
+        lines.push({ type: "Feature", properties: { color: c.kind[a.k], op: a.op * fade, w: a.w }, geometry: { type: "LineString", coordinates: a.c.slice(0, n) } });
+        if (t <= 1) heads.push({ type: "Feature", properties: { color: c.kind[a.k] }, geometry: { type: "Point", coordinates: a.c[n - 1] } });
+        else if (!a.ambient) heads.push({ type: "Feature", properties: { color: c.kind[a.k], ring: (t - 1) / 0.5 }, geometry: { type: "Point", coordinates: TARGET } });
       }
-      if (lines.length || !idlePushed) {          // when idle, push one empty update then stop
-        map.getSource("arcs").setData({ type: "FeatureCollection", features: lines });
-        map.getSource("heads").setData({ type: "FeatureCollection", features: heads.filter(Boolean) });
+      if (lines.length || !idlePushed) {          // when idle, push one empty update and then stop
+        map.getSource("arcs").setData(fc(lines)); map.getSource("heads").setData(fc(heads));
         idlePushed = lines.length === 0;
       }
-    }
-    if (now - lastPulse >= 50) {
-      lastPulse = now;
-      const t = (now % 2000) / 2000;
-      map.setPaintProperty("target-pulse", "circle-radius", 6 + t * 22);
-      map.setPaintProperty("target-pulse", "circle-opacity", 0.5 * (1 - t));
+      if (trailsDirty) { trailsDirty = false; map.getSource("trails").setData(trailsFC()); }
     }
   } catch (err) {
-    loopErrors++;
     console.error("attack map frame error", err);
-    arcs.length = 0;                             // drop whatever broke it and carry on
+    arcs.length = 0;                              // drop whatever broke it and carry on
   }
   requestAnimationFrame(frame);
 }
 
-let lastLive = 0, history = [], historyOn = true;
-function fire(e, ambient = false) {
-  if (!mapReady || document.hidden) return;
-  if (!ambient) lastLive = performance.now();
-  arcs.push({ coords: greatCircle([e.lon, e.lat], TARGET), color: COLORS[kind(e)], start: performance.now(),
-              dur: ambient ? 2600 : 2200, ambient });
-}
-setInterval(() => {
-  if (!historyOn || !history.length || performance.now() - lastLive < AMBIENT_EVERY_MS) return;
-  // bias toward recent events: square of a uniform number picks the newest end more often
-  fire(history[Math.floor(Math.random() ** 2 * history.length)], true);
-}, AMBIENT_EVERY_MS);
-
-map.on("load", () => {
-  // tone the basemap down a little so the attack layers stand out
-  for (const l of map.getStyle().layers) {
-    if (l.type === "symbol" && /^place_(country|state|city)/.test(l.id) === false && /name/.test(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
-  }
-  map.addSource("points", { type: "geojson", data: empty() });
-  map.addSource("arcs", { type: "geojson", data: empty() });
-  map.addSource("heads", { type: "geojson", data: empty() });
-  map.addSource("target", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: TARGET } } });
-
-  map.addLayer({ id: "points-glow", type: "circle", source: "points", paint: {
-    "circle-color": ["get", "color"], "circle-opacity": 0.18, "circle-blur": 0.8,
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 6, ["*", 3, ["ln", ["get", "n"]]]], 8, ["+", 14, ["*", 5, ["ln", ["get", "n"]]]]] } });
-  map.addLayer({ id: "points", type: "circle", source: "points", paint: {
-    "circle-color": ["get", "color"], "circle-opacity": 0.85, "circle-stroke-color": "#070b12", "circle-stroke-width": 1,
-    "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2.5, ["*", 1.2, ["ln", ["get", "n"]]]], 8, ["+", 5, ["*", 2, ["ln", ["get", "n"]]]]] } });
-  map.addLayer({ id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: {
-    "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": ["get", "w"], "line-blur": 0.5 } });
-  map.addLayer({ id: "heads", type: "circle", source: "heads", paint: {
-    "circle-color": ["get", "color"], "circle-blur": 0.4,
-    "circle-radius": ["case", ["has", "impact"], ["-", 18, ["*", 14, ["get", "impact"]]], 3.5],
-    "circle-opacity": ["case", ["has", "impact"], ["get", "impact"], 1] } });
-  map.addLayer({ id: "target-pulse", type: "circle", source: "target", paint: { "circle-color": "#2ee59d", "circle-radius": 8, "circle-opacity": 0.4 } });
-  map.addLayer({ id: "target", type: "circle", source: "target", paint: {
-    "circle-color": "#2ee59d", "circle-radius": 5, "circle-stroke-color": "#070b12", "circle-stroke-width": 1.5 } });
-
-  const pop = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
-  map.on("mousemove", "points", ev => {
-    const p = ev.features[0].properties;
-    map.getCanvas().style.cursor = "pointer";
-    pop.setLngLat(ev.lngLat).setHTML(`<b>${esc(p.city)}</b> ${esc(p.country)}<br>${p.n} event${p.n > 1 ? "s" : ""} · ${esc(p.kinds)}`).addTo(map);
-  });
-  map.on("mouseleave", "points", () => { map.getCanvas().style.cursor = ""; pop.remove(); });
-  map.on("mousemove", "target", ev => pop.setLngLat(ev.lngLat).setHTML("<b>Honeypot</b> Columbus, Ohio").addTo(map));
-  map.on("mouseleave", "target", () => pop.remove());
-
-  mapReady = true;
-  if (lastPoints) map.getSource("points").setData(lastPoints);
-  requestAnimationFrame(frame);
-});
-// self-heal for a page left running on a screen: reload if no successful poll for 5 minutes,
-// and once every 6 hours regardless (keeps memory/tiles fresh).
-let lastOk = Date.now();
-setInterval(() => {
-  if (Date.now() - lastOk > 5 * 60000 || performance.now() > 6 * 3600000) location.reload();
-}, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) arcs.length = 0; });
-// the sidebar/feed must not wait for the map (map "load" needs a visible, rendering tab)
-poll();
-setInterval(poll, POLL_MS);
-
-document.getElementById("btn-globe").onclick = ev => {
-  const on = ev.currentTarget.getAttribute("aria-pressed") !== "true";
-  ev.currentTarget.setAttribute("aria-pressed", String(on));
-  map.setProjection({ type: on ? "globe" : "mercator" });
-  map.easeTo(on ? { center: TARGET, zoom: 1.4 } : HOME_VIEW);
-};
-document.getElementById("btn-home").onclick = () => map.easeTo(HOME_VIEW);
-document.getElementById("btn-hist").onclick = ev => {
-  historyOn = ev.currentTarget.getAttribute("aria-pressed") !== "true";
-  ev.currentTarget.setAttribute("aria-pressed", String(historyOn));
-};
-
-// ---------------------------------------------------------------- sidebar
-function describe(e) {
-  if (e.type === "login-failed" || e.type === "login-success") return `login ${esc(e.user)} / ${esc(e.pass)}${e.type === "login-success" ? " ✔" : ""}`;
-  if (e.type === "command") return `$ ${esc(e.cmd)}`;
-  if (e.type === "connect") return `connect :${esc(e.port)}`;
-  if (e.type === "blocked") return `blocked ${esc(e.proto)}:${esc(e.port ?? "?")}`;
-  if (e.type === "web-probe") return `${esc(e.method)} ${esc(e.path)}`;
-  return esc(e.type);
-}
-
-function addFeedLine(e) {
-  const feed = document.getElementById("feed"), d = document.createElement("div");
-  const t = new Date(e.t).toLocaleTimeString();
-  d.innerHTML = `<span class="tag" style="color:${COLORS[kind(e)]}">${kind(e)}</span>${t} ${esc(e.cc)} ${esc(e.src)} — ${describe(e)}`;
-  feed.prepend(d);
-  while (feed.childElementCount > 150) feed.lastChild.remove();
-}
-
-function bars(el, items, fmt = v => esc(v)) {
-  const max = Math.max(1, ...items.map(i => i.count));
-  document.getElementById(el).innerHTML = items.length ? items.map(i =>
-    `<div class="bar" style="--w:${(i.count / max * 100).toFixed(1)}%"><span>${fmt(i.value)}</span><span>${i.count}</span></div>`).join("")
-    : '<div style="color:var(--dim)">no data yet</div>';
-}
-
-const seen = new Set();
-let firstLoad = true, mapReady = false, lastPoints = null;
-
-function render(feed) {
-  const s = feed.stats;
-  document.getElementById("k-total").textContent = s.total.toLocaleString();
-  document.getElementById("k-src").textContent = s.unique_sources.toLocaleString();
-  document.getElementById("k-cc").textContent = new Set(feed.events.map(e => e.cc)).size;
-  document.getElementById("k-login").textContent = ((s.by_type["login-failed"] || 0) + (s.by_type["login-success"] || 0)).toLocaleString();
-  document.getElementById("updated").textContent = "live · updated " + new Date(feed.generated).toLocaleTimeString();
-  bars("t-countries", s.top_countries);
-  bars("t-ports", s.top_ports);
-  bars("t-users", s.top_usernames, v => `<code>${esc(v)}</code>`);
-  bars("t-pass", s.top_passwords, v => `<code>${esc(v)}</code>`);
-  bars("t-cmds", s.top_commands, v => `<code>${esc(v)}</code>`);
-
-  // one dot per location; colour = most frequent kind there
-  const byLoc = new Map();
-  for (const e of feed.events) {
-    const k = `${e.lat},${e.lon}`;
-    const cur = byLoc.get(k) || { e, n: 0, kinds: {} };
-    cur.n++; cur.kinds[kind(e)] = (cur.kinds[kind(e)] || 0) + 1;
-    byLoc.set(k, cur);
-  }
-  const features = [...byLoc.values()].map(({ e, n, kinds }) => {
-    const top = Object.entries(kinds).sort((a, b) => b[1] - a[1])[0][0];
-    return { type: "Feature", geometry: { type: "Point", coordinates: [e.lon, e.lat] },
-             properties: { n, color: COLORS[top], city: e.city || "", country: e.country || "",
-                           kinds: Object.entries(kinds).map(([k, v]) => `${v} ${k}`).join(", ") } };
-  });
-  lastPoints = { type: "FeatureCollection", features };
-  if (mapReady) map.getSource("points").setData(lastPoints);
-
-  history = feed.events;   // newest first
-  const fresh = feed.events.filter(e => !seen.has(key(e)));
-  fresh.forEach(e => seen.add(key(e)));
-  // Schedule each new event at its real time + LAG. On first load that means events from the last
-  // LAG window play out live; older ones only show up in the feed list / ambient replay.
-  const now = Date.now();
-  if (firstLoad) {
-    fresh.filter(e => now - Date.parse(e.t) > LAG_MS).slice(0, 25).reverse().forEach(addFeedLine);
-  }
-  let prevAt = 0;
-  // after the first load every new event plays live; late arrivals (batched sources) play ASAP
-  (firstLoad ? fresh.filter(e => now - Date.parse(e.t) <= LAG_MS) : fresh).reverse().forEach(e => {
-    let at = Date.parse(e.t) + LAG_MS - now;
-    at = Math.max(at, prevAt + 250, 0);          // never two in the same instant
-    prevAt = at;
-    setTimeout(() => { fire(e); addFeedLine(e); }, at);
-  });
-  firstLoad = false;
-}
-
-async function poll() {
+function initMap() {
+  if (!window.maplibregl) { $("map").insertAdjacentHTML("beforeend", '<div class="nomap">The map could not load. The logbook and the desk below still update.</div>'); return; }
+  const narrow = innerWidth < 900;
   try {
-    const r = await fetch("feed.json", { cache: "no-store" });
-    if (r.ok) { render(await r.json()); lastOk = Date.now(); }
+    map = new maplibregl.Map({ container: "map", style: baseStyle(C()), center: narrow ? [-20, 30] : [-35, 32], zoom: narrow ? 0.6 : 1.55,
+      minZoom: 0.5, maxZoom: 9, dragRotate: false, attributionControl: { compact: true, customAttribution: 'IP geolocation <a href="https://db-ip.com">DB-IP</a>' } });
   } catch (err) {
-    document.getElementById("updated").textContent = "reconnecting…";
+    console.error("map init failed", err);
+    $("map").insertAdjacentHTML("beforeend", '<div class="nomap">The map needs WebGL, which this browser does not offer. The logbook and the desk below still update.</div>');
+    return;
+  }
+  map.touchZoomRotate.disableRotation();
+  // layers go on as soon as the (inline) style is parsed, so dots and arcs never wait for slow tiles
+  map.on("style.load", () => {
+    if (mapReady) return;
+    const c = C();
+    map.addSource("trails", { type: "geojson", data: fc([]) });
+    map.addSource("points", { type: "geojson", data: fc([]) });
+    map.addSource("arcs", { type: "geojson", data: fc([]) });
+    map.addSource("heads", { type: "geojson", data: fc([]) });
+    map.addSource("target", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: TARGET } } });
+    map.addLayer({ id: "trails", type: "line", source: "trails", paint: { "line-color": ["get", "color"], "line-width": 0.6, "line-opacity": 0.16 } });
+    map.addLayer({ id: "points", type: "circle", source: "points", paint: {
+      "circle-color": ["get", "color"], "circle-opacity": 0.55, "circle-stroke-color": c.land, "circle-stroke-width": 0.6,
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 1.6, ["*", 1.3, ["ln", ["get", "n"]]]], 6, ["+", 4, ["*", 2.4, ["ln", ["get", "n"]]]]] } });
+    map.addLayer({ id: "arcs", type: "line", source: "arcs", layout: { "line-cap": "round" }, paint: {
+      "line-color": ["get", "color"], "line-opacity": ["get", "op"], "line-width": ["get", "w"] } });
+    map.addLayer({ id: "heads", type: "circle", source: "heads", paint: { "circle-color": ["get", "color"],
+      "circle-radius": ["case", ["has", "ring"], ["+", 3, ["*", 14, ["get", "ring"]]], 2.4],
+      "circle-opacity": ["case", ["has", "ring"], 0, 1],
+      "circle-stroke-color": ["get", "color"], "circle-stroke-width": ["case", ["has", "ring"], 1.2, 0],
+      "circle-stroke-opacity": ["case", ["has", "ring"], ["-", 1, ["get", "ring"]], 0] } });
+    map.addLayer({ id: "target", type: "circle", source: "target", paint: { "circle-color": c.target, "circle-radius": 4,
+      "circle-stroke-color": c.land, "circle-stroke-width": 1.5 } });
+    map.addLayer({ id: "target-label", type: "symbol", source: "target",
+      layout: { "text-field": "Columbus", "text-font": ["Noto Sans Regular"], "text-size": 11, "text-offset": [0, 1.1], "text-anchor": "top" },
+      paint: { "text-color": c.target, "text-halo-color": c.land, "text-halo-width": 1.2 } });
+    map.on("click", "points", ev => { const p = ev.features[0].properties; if (p.src) userSelect("attacker", { ip: p.src, place: p.key }); });
+    map.on("mouseenter", "points", () => map.getCanvas().style.cursor = "pointer");
+    map.on("mouseleave", "points", () => map.getCanvas().style.cursor = "");
+    mapReady = true;
+    pushPoints(); seedTrails(); trailsDirty = true;
+    if (!REDUCED) requestAnimationFrame(frame);
+  });
+}
+
+// ambient replay: when no live arc has played for a moment, replay a recent real event as a faint arc
+setInterval(() => {
+  if (REDUCED || !S.feed || performance.now() - lastLive < AMBIENT_MS) return;
+  const ev = S.feed.events;
+  for (let tries = 0; tries < 8 && ev.length; tries++) {
+    const e = ev[Math.floor(Math.random() ** 2 * ev.length)];      // newest first: squaring biases to recent
+    if (hasGeo(e) && !S.hidden.has(kindOf(e))) { fire(e, true); return; }
+  }
+}, AMBIENT_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) arcs.length = 0; });
+
+// ------------------------------------------------------------------ live pacing
+function play(e) { print(e); fire(e, false); }
+function schedule(list) {
+  for (const e of list) S.queue.push({ e, due: Date.parse(e.t) + LAG_MS });
+  S.queue.sort((a, b) => a.due - b.due);
+  if (S.queue.length > 3000) S.queue.splice(0, S.queue.length - 3000);
+}
+setInterval(() => {
+  const now = Date.now();
+  while (S.queue.length && S.queue[0].due <= now) play(S.queue.shift().e);
+}, 200);
+function ingest(events) {
+  const now = Date.now(), fresh = [];
+  for (const e of events) { const k = evKey(e); if (!S.seen.has(k)) { S.seen.add(k); fresh.push(e); } }
+  fresh.reverse();                                                     // oldest first
+  if (!S.primed) {                                                     // first load: the last 25 printed, the rest of the lag window plays
+    S.primed = true;
+    fresh.filter(e => now - Date.parse(e.t) > LAG_MS).slice(-25).forEach(print);
+    schedule(fresh.filter(e => now - Date.parse(e.t) <= LAG_MS));
+  } else {
+    schedule(fresh.filter(e => now - Date.parse(e.t) < 10 * 60000));  // late arrivals play at once; much older ones are only counted
   }
 }
+
+// ------------------------------------------------------------------ polling and self-heal
+async function getJSON(name) {
+  const r = await fetch(name, { cache: "no-store" });
+  if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
+  return r.json();
+}
+function ok(gen) { S.lastOk = Date.now(); S.everOk = true; S.failing = false; if (gen && (!S.lastGen || gen > S.lastGen)) S.lastGen = gen; refreshStatus(); }
+function failed(err) { console.warn(err); S.failing = true; refreshStatus(); }
+async function pollFeed() {
+  try {
+    const f = await getJSON("feed.json");
+    if (!f || !Array.isArray(f.events)) throw new Error("feed.json: bad shape");
+    S.feed = f; ok(f.generated); renderHeader(); ingest(f.events); seedTrails();
+    if (!S.deskStarted && !S.ins) setTimeout(() => startDesk(), 8000);
+  } catch (err) { failed(err); }
+}
+async function pollLive() {
+  try {
+    const l = await getJSON("live.json");
+    if (!l || !Array.isArray(l.events)) throw new Error("live.json: bad shape");
+    ok(l.generated);
+    S.live = l.events;
+    if (S.feed) { S.feed.stats = l.stats || S.feed.stats; renderHeader(); }
+    ingest(l.events);
+  } catch (err) { failed(err); }
+}
+async function pollInsights() {
+  try {
+    const i = await getJSON("insights.json");
+    if (!i || typeof i !== "object") throw new Error("insights.json: bad shape");
+    S.ins = i; ok(i.generated); pushPoints(); renderHeader();
+    if (!S.deskStarted) startDesk(); else refreshDesk();
+  } catch (err) { failed(err); }
+}
+// self-heal for a page left running on a screen: reload after 5 min without a successful poll, and every 6 h regardless
+setInterval(() => { if (Date.now() - S.lastOk > 5 * 60000 || performance.now() > 6 * 3600000) location.reload(); }, 60000);
+
+// ------------------------------------------------------------------ the desk
+const desk = { tab: "session", pinned: false, sel: {}, cur: { session: -1, attacker: -1, campaigns: -1, malware: -1 }, timer: null };
+const sessIndex = () => S.ins?.sessions || [];
+const camps = () => S.ins?.campaigns || [];
+const malwareRows = () => S.ins?.malware || [];
+function topAttackers() {
+  const p = S.ins?.profiles || {};
+  return Object.values(p).filter(x => x.ip).sort((a, b) => (b.n24 || 0) - (a.n24 || 0)).map(x => x.ip);
+}
+function hasData(t) {
+  if (t === "session") return sessIndex().length > 0;
+  if (t === "attacker") return topAttackers().length > 0 || !!S.feed?.events.length;
+  if (t === "campaigns") return camps().length > 0;
+  if (t === "trends") return !!S.ins?.trends?.grid;
+  if (t === "malware") return malwareRows().length > 0;
+}
+function drawTabs() {
+  $("tabs").innerHTML = TABS.map(t => `<button type="button" role="tab" id="tab-${t}" aria-controls="panel" data-tab="${t}" aria-selected="${desk.tab === t}"` +
+    `${hasData(t) ? "" : ' class="empty"'}>${TAB_LABEL[t]}</button>`).join("") +
+    `<button type="button" class="pin" id="pin" title="Resume the tour"${desk.pinned ? "" : " hidden"}>pinned, click to resume the tour</button>`;
+}
+$("tabs").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  if (b.id === "pin" || (b.dataset.tab === desk.tab && desk.pinned)) return resumeTour();
+  if (b.dataset.tab) userSelect(b.dataset.tab, desk.sel[b.dataset.tab] || defaultSel(b.dataset.tab));
+});
+function defaultSel(t) {
+  if (t === "session") { const s = sessIndex()[0]; return s ? { id: s.id } : {}; }
+  if (t === "attacker") { const ip = topAttackers()[0] || S.feed?.events[0]?.src; return ip ? { ip } : {}; }
+  if (t === "campaigns") { const c = camps()[0]; return c ? { c: c.id } : {}; }
+  return {};
+}
+function writeHash() {
+  const p = new URLSearchParams({ tab: desk.tab }), s = desk.sel[desk.tab] || {};
+  if (desk.tab === "attacker" && s.ip) p.set("ip", s.ip);
+  if (desk.tab === "session" && s.id) p.set("id", s.id);
+  if (desk.tab === "campaigns" && s.c) p.set("c", s.c);
+  history.replaceState(null, "", "#" + p.toString());
+}
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1)), tab = p.get("tab");
+  if (!TABS.includes(tab)) return null;
+  const sel = {};
+  if (p.get("ip")) sel.ip = p.get("ip").slice(0, 64);
+  if (p.get("id") && SID.test(p.get("id"))) sel.id = p.get("id");
+  if (p.get("c")) sel.c = p.get("c").slice(0, 64);
+  return { tab, sel };
+}
+function userSelect(tab, sel) {                   // any click: pin that tab with that item
+  desk.pinned = true; desk.tab = tab; desk.sel[tab] = sel || {};
+  writeHash(); renderDesk();
+}
+function resumeTour() {
+  desk.pinned = false;
+  history.replaceState(null, "", location.pathname + location.search);
+  tourStep();
+}
+function tourStep() {
+  if (desk.pinned) return;
+  const start = TABS.indexOf(desk.tab);
+  let t = null;
+  for (let i = 1; i <= TABS.length; i++) { const c = TABS[(start + i) % TABS.length]; if (hasData(c)) { t = c; break; } }
+  if (!t) { desk.tab = "session"; renderDesk(); return; }
+  desk.tab = t;
+  const next = (arr, k) => arr.length ? arr[(desk.cur[k] = (desk.cur[k] + 1) % arr.length)] : null;
+  if (t === "session") { const s = next(sessIndex(), "session"); desk.sel.session = s ? { id: s.id } : {}; }
+  if (t === "attacker") { const ip = next(topAttackers().slice(0, 30), "attacker"); desk.sel.attacker = ip ? { ip } : defaultSel("attacker"); }
+  if (t === "campaigns") { const c = next(camps().slice(0, 10), "campaigns"); desk.sel.campaigns = c ? { c: c.id } : {}; }
+  if (t === "malware") { const m = next(malwareRows().slice(0, 10), "malware"); desk.sel.malware = m ? { u: m.url } : {}; }
+  renderDesk();
+}
+function startDesk() {
+  if (S.deskStarted) return;
+  S.deskStarted = true;
+  const h = readHash();
+  if (h) { desk.pinned = true; desk.tab = h.tab; desk.sel[h.tab] = Object.keys(h.sel).length ? h.sel : defaultSel(h.tab); renderDesk(); }
+  else { desk.tab = "malware"; tourStep(); }      // the tour starts at the first tab with data, from the left
+  setInterval(() => { if (!desk.pinned) tourStep(); }, TOUR_MS);
+}
+addEventListener("hashchange", () => {
+  const h = readHash();
+  if (h && S.deskStarted) { desk.pinned = true; desk.tab = h.tab; desk.sel[h.tab] = Object.keys(h.sel).length ? h.sel : defaultSel(h.tab); renderDesk(); }
+});
+function refreshDesk() {                          // new insights: tabs always; the panel only while touring a still view
+  drawTabs();
+  if (!desk.pinned && desk.tab !== "session") renderPanel();
+}
+let playToken = 0;
+function renderDesk() { drawTabs(); renderPanel(); }
+function renderPanel() {
+  const panel = $("panel");
+  playToken++;
+  panel.className = "panel";
+  panel.setAttribute("aria-labelledby", "tab-" + desk.tab);
+  panel.scrollTop = 0;
+  try {
+    if (desk.tab === "session") return renderSession(panel, desk.sel.session || {});
+    panel.innerHTML = desk.tab === "attacker" ? attackerHTML(desk.sel.attacker || {})
+      : desk.tab === "campaigns" ? campaignsHTML(desk.sel.campaigns || {})
+      : desk.tab === "trends" ? trendsHTML() : malwareHTML(desk.sel.malware || {});
+  } catch (err) {
+    console.error("desk render error", err);
+    panel.innerHTML = '<p class="note">This view could not be drawn from the current data.</p>';
+  }
+}
+$("panel").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-go]");
+  if (!b) return;
+  const [tab, k, v] = b.dataset.go.split("|");
+  userSelect(tab, { [k]: v });
+});
+const go = (tab, k, v, label) => `<button type="button" class="link" data-go="${esc(`${tab}|${k}|${v}`)}">${label}</button>`;
+
+// ---- Session
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function renderSession(panel, sel) {
+  const tok = playToken, idx = sessIndex();
+  panel.classList.add("sess");
+  if (!idx.length) {
+    panel.innerHTML = '<p class="note">No recorded shell sessions yet. The decoy has been recording them since 2026-10-13.</p>';
+    return;
+  }
+  const meta = idx.find(s => s.id === sel.id) || idx[0];
+  panel.innerHTML = `<p class="cap" id="scap">${esc(meta.summary || "A recorded session")}, loading…</p><div class="tty" id="tty"></div>`;
+  let s;
+  try { s = await getJSON(`sessions/${meta.id}.json`); }
+  catch (err) { if (tok === playToken) $("scap").textContent = "This session is no longer published; the next one follows on the tour."; return; }
+  if (tok !== playToken) return;
+  const p = S.ins?.profiles?.[s.src] || {}, camp = camps().find(c => c.id === meta.campaign);
+  const org = orgShort(p.org), place = [meta.city || p.city, meta.country || p.country].filter(Boolean).join(", ");
+  let cap = `${esc(secs(s.duration))} from ${org ? `a ${esc(org)} network` : "a network"}${place ? ` in <b>${esc(place)}</b>` : ""}. `;
+  if (s.user) cap += `Logged in as <code>${esc(s.user)} / ${esc(s.pass ?? "")}</code>. `;
+  const v = meta.verdict || p.verdict;
+  if (v) cap += `Verdict: ${esc(v)}. `;
+  if (camp) cap += `Part of campaign ${go("campaigns", "c", camp.id, `"${esc(camp.label)}"`)} (${plural(camp.ips, "machine")}). `;
+  cap += go("attacker", "ip", s.src, "More about this machine");
+  $("scap").innerHTML = cap;
+  const tty = $("tty"), prompt = s.user === "root" ? "root@nas-backup01:~# " : `${s.user || "user"}@nas-backup01:~$ `;
+  const add = ([, d, text]) => {
+    const div = document.createElement("div"), t = String(text).replace(/\r?\n$/, "").replace(/\r/g, "");
+    if (d === "i") { div.textContent = prompt + t; if (BAD.test(t)) div.className = "bad"; }
+    else { div.textContent = t; div.className = "o"; }
+    tty.appendChild(div);
+    while (tty.childElementCount > 60) tty.firstChild.remove();
+  };
+  const lines = Array.isArray(s.lines) ? s.lines : [];
+  if (REDUCED) { lines.forEach(add); return; }
+  for (;;) {                                       // whole lines at their recorded pace, gaps capped at 1.5 s
+    tty.innerHTML = "";
+    let prev = lines.length ? Number(lines[0][0]) || 0 : 0;
+    for (const l of lines) {
+      await wait(Math.min(Math.max((Number(l[0]) || 0) - prev, 0) * 1000, 1500));
+      if (tok !== playToken) return;
+      prev = Number(l[0]) || prev; add(l);
+    }
+    await wait(12000);
+    if (tok !== playToken || !desk.pinned) return;  // pinned: play it again; touring: the tour moves on
+  }
+}
+
+// ---- Attacker
+function buildProfile(ip) {                      // not in insights.profiles: build one from the feed
+  const rows = [...(S.feed?.events || []), ...S.live].filter(e => e.src === ip);
+  if (!rows.length) return null;
+  rows.sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
+  const g = rows.find(hasGeo) || rows[rows.length - 1], cnt = (arr) => {
+    const m = {}; arr.forEach(v => m[v] = (m[v] || 0) + 1);
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([value, count]) => ({ value, count }));
+  };
+  const kinds = {}; rows.forEach(e => { const k = kindOf(e); kinds[k] = (kinds[k] || 0) + 1; });
+  return { ip, asn: g.asn, org: g.org, city: g.city, country: g.country, first: rows[0].t, last: rows[rows.length - 1].t,
+           kinds, ports: cnt(rows.filter(e => e.port != null).map(e => e.port)),
+           creds: cnt(rows.filter(e => /^login/.test(e.type)).map(e => `${e.user ?? ""} / ${e.pass ?? ""}`)),
+           cmds: [...new Set(rows.filter(e => e.cmd).map(e => e.cmd))], sessions: [...new Set(rows.filter(e => e.session).map(e => e.session))],
+           campaigns: [], verdict: rows.find(e => e.verdict)?.verdict, partial: true };
+}
+function othersAt(place, except) {
+  const m = {};
+  for (const e of [...(S.feed?.events || []), ...S.live]) if (hasGeo(e) && `${e.lat},${e.lon}` === place && e.src !== except) m[e.src] = (m[e.src] || 0) + 1;
+  return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 5);
+}
+function attackerHTML(sel) {
+  const ip = sel.ip;
+  if (!ip) return '<p class="note">No attackers in the data yet.</p>';
+  const p = S.ins?.profiles?.[ip] || buildProfile(ip);
+  if (!p) return `<p class="lede"><span class="mono">${esc(ip)}</span> is not in the last 24 hours of data any more.</p>`;
+  const org = orgShort(p.org), where = p.city || p.country;
+  let h = `<p class="lede"><span class="mono">${esc(ip)}</span>${org ? `, ${esc(org)}${p.asn ? ` (AS${esc(p.asn)})` : ""}` : ""}${where ? `, ${esc(where)}` : ""}. ` +
+          `Seen first ${ago(p.first)}, last ${ago(p.last)}${p.returning ? ", returning" : ""}.</p>`;
+  if (p.verdict) h += `<p class="lede"><b>Verdict: ${esc(p.verdict)}.</b> ${esc(VERDICT[p.verdict] || "")}</p>`;
+  if (p.partial) h += '<p class="note">Built from the last 24 hours of events; the full 7-day profile covers only the busiest machines.</p>';
+  const sec = [];
+  const kinds = Object.entries(p.kinds || {}).sort((a, b) => b[1] - a[1]);
+  if (kinds.length) sec.push(`<section><h3>Events by kind${p.partial ? "" : ", 7 days"}</h3><dl class="kv">${kinds.map(([k, v]) => `<dt>${esc(NAMES[k] || k)}</dt><dd>${fmt(v)}</dd>`).join("")}</dl></section>`);
+  if (p.ports?.length) sec.push(`<section><h3>Top ports</h3><p style="margin:0">${p.ports.slice(0, 8).map(x => `${esc(x.value)} <span class="n" style="color:var(--ink2)">(${fmt(x.count)})</span>`).join(", ")}</p></section>`);
+  if (p.creds?.length) sec.push(`<section><h3>Logins tried</h3><ul class="lst">${p.creds.slice(0, 8).map(x => `<li><code>${esc(x.value)}</code> <span class="n">${fmt(x.count)}×</span></li>`).join("")}</ul></section>`);
+  if (p.cmds?.length) sec.push(`<section><h3>Commands</h3><ul class="lst">${p.cmds.slice(0, 8).map(c => `<li><code${BAD.test(c) ? ' style="color:var(--red)"' : ""}>${esc(c)}</code></li>`).join("")}</ul></section>`);
+  const pc = (p.campaigns || []).map(id => camps().find(c => c.id === id)).filter(Boolean);
+  if (pc.length) sec.push(`<section><h3>Campaigns</h3><ul class="lst">${pc.map(c => `<li>${go("campaigns", "c", c.id, `"${esc(c.label)}"`)} <span class="n">${plural(c.ips, "machine")}</span></li>`).join("")}</ul></section>`);
+  const ps = sessIndex().filter(s => s.src === ip);
+  if (ps.length) sec.push(`<section><h3>Recorded sessions</h3><ul class="lst">${ps.map(s => `<li>${go("session", "id", s.id, `${esc(dateShort(s.start))} ${esc(hhmm(s.start))} UTC`)} <span class="n">${esc(s.summary || "")}</span></li>`).join("")}</ul></section>`);
+  if (sel.place) {
+    const o = othersAt(sel.place, ip);
+    if (o.length) sec.push(`<section><h3>Other machines at this place</h3><ul class="lst">${o.map(([oip, n]) => `<li>${go("attacker", "ip", oip, `<span class="mono">${esc(oip)}</span>`)} <span class="n">${plural(n, "event")}</span></li>`).join("")}</ul></section>`);
+  }
+  return h + `<div class="grid2">${sec.join("")}</div>`;
+}
+
+// ---- Campaigns
+function sessionFor(c) {
+  const idx = sessIndex();
+  return (idx.find(s => s.campaign === c.id) || idx.find(s => s.id === c.sample_session) || {}).id;
+}
+function span(c) {
+  const ms = Date.parse(c.last) - Date.parse(c.first), h = ms / 3600000;
+  return h < 1.5 ? "within an hour" : h < 36 ? `over ${Math.round(h)} hours` : `over ${Math.round(h / 24)} days`;
+}
+const nCountries = c => c.n_countries ?? (c.countries || []).length;
+function countriesPhrase(c) { return plural(nCountries(c), "country", "countries"); }
+function countriesList(c) {
+  const shown = (c.countries || []).slice(), more = nCountries(c) - shown.length;
+  if (more > 0) shown.push(`${plural(more, "other")}`);
+  return andList(shown);
+}
+function campaignsHTML(sel) {
+  const cs = camps();
+  if (!cs.length) return '<p class="note">No campaigns yet. A campaign is at least two machines running the same command script, or three trying the same password list in the same order.</p>';
+  const big = cs[0];
+  let h = `<p class="lede">The largest campaign, "${esc(big.label)}", came from ${plural(big.ips, "machine")} in ${countriesPhrase(big)} ${span(big)}.</p>`;
+  h += '<p class="note">Machines that run the same script or the same password list are almost certainly one botnet working from one set of instructions. Pick one to watch a recording.</p><ul class="rows">';
+  for (const c of cs.slice(0, 20)) {
+    const sid = sessionFor(c), go2 = sid ? `session|id|${sid}` : `attacker|ip|${(c.members || [])[0] || ""}`;
+    const orgs = (c.orgs || []).map(orgShort).filter(Boolean);
+    h += `<li><button type="button" class="rowbtn${sel.c === c.id ? " sel" : ""}" data-go="${esc(go2)}">` +
+         `<span class="t1"><code>${esc(c.label)}</code>, ${c.kind === "passwords" ? "same password list" : "same command script"}</span>` +
+         `<span class="t2">${plural(c.ips, "machine")} in ${esc(countriesList(c) || "unknown countries")}${orgs.length ? `. Owners: ${esc(andList(orgs))}` : ""}. ` +
+         `First seen ${esc(dateShort(c.first))}, last ${esc(dateShort(c.last))}.</span></button></li>`;
+  }
+  return h + "</ul>";
+}
+
+// ---- Trends
+function trendsHTML() {
+  const T = S.ins?.trends;
+  if (!T?.grid) return '<p class="note">Not enough data yet to show a week.</p>';
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const iso = Array.isArray(T.grid_days) && T.grid_days.length === 7 ? T.grid_days
+    : [...Array(7)].map((_, i) => new Date(+today - (6 - i) * 86400000).toISOString().slice(0, 10));
+  const days = iso.map((d, i) => i === 6 ? "Today (so far)" : (() => {
+    const t = new Date(d + "T00:00:00Z");
+    return `${t.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })} ${t.getUTCDate()} ${t.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" })}`;
+  })());
+  let h = '<p class="lede">Each strip is a week: one row per UTC day, one cell per UTC hour; darker means busier. The last row is today so far.</p>';
+  for (const [ch, name] of CHANNELS) {
+    const g = T.grid[ch];
+    if (!g) continue;
+    const flat = g.flat(), max = Math.max(...flat), last24 = (T.hourly24?.[ch] || g[6]).reduce((a, b) => a + b, 0);
+    if (!max) continue;
+    const tv = times(T.today_vs_usual?.[ch]);
+    h += `<div class="chan"><p><b>${esc(name)}</b>: ${fmt(last24)} in the last 24 hours${tv ? `, ${tv}` : ", no usual day to compare with yet"}.</p>` +
+         `<div class="heat" aria-hidden="true">${g.map((row, i) => `<span>${days[i]}</span>` +
+           row.map(v => `<i style="opacity:${v ? (0.12 + 0.88 * Math.sqrt(v / max)).toFixed(2) : 0.04}"></i>`).join("")).join("")}` +
+         `<span></span>${[0, 6, 12, 18].map(x => `<span class="hr">${String(x).padStart(2, "0")}:00</span>`).join("")}</div></div>`;
+  }
+  const B = S.ins?.baseline;
+  if (B && (B.ports?.length || B.usernames?.length)) {
+    const np = (B.global_ports || []).length, nu = (B.global_usernames || []).length;
+    const ps = (B.ports || []).slice(0, 6).map(r => r.global_rank
+      ? `Port ${esc(r.value)} is our #${r.ours_rank} and the internet's #${r.global_rank}.`
+      : `Port ${esc(r.value)} is our #${r.ours_rank}; it is not in the internet top ${np}.`);
+    const us = (B.usernames || []).slice(0, 4).map(r => r.global_rank
+      ? `The username <code>${esc(r.value)}</code> is our #${r.ours_rank} and the internet's #${r.global_rank}.`
+      : `The username <code>${esc(r.value)}</code> is our #${r.ours_rank}; it is not in the internet top ${nu}.`);
+    h += `<div class="sub"><h3>Here compared with the whole internet</h3>${[...ps, ...us].map(x => `<p>${x}</p>`).join("")}` +
+         `<p class="note">${esc(String(B.attribution || "Global baseline: SANS ISC / DShield").replace(/\.?$/, "."))}${B.fetched ? ` Fetched ${esc(dateShort(B.fetched))}.` : ""}</p></div>`;
+  }
+  return h;
+}
+
+// ---- Malware
+function malwareHTML(sel) {
+  const rows = malwareRows();
+  if (!rows.length) return '<p class="note">No download attempts recorded yet.</p>';
+  let h = '<p class="lede">What the bots tried to fetch after they got in. The addresses are defanged on purpose: they are not links, and they are not safe to visit.</p><ul class="rows">';
+  for (const m of rows.slice(0, 30)) {
+    const links = m.sha256 && m.links ? ` Hash: ${m.links.malwarebazaar ? `<a href="${esc(m.links.malwarebazaar)}" rel="noopener noreferrer nofollow" target="_blank">MalwareBazaar</a>` : ""}` +
+      `${m.links.malwarebazaar && m.links.virustotal ? ", " : ""}${m.links.virustotal ? `<a href="${esc(m.links.virustotal)}" rel="noopener noreferrer nofollow" target="_blank">VirusTotal</a>` : ""}.` : "";
+    h += `<li class="mal${sel.u === m.url ? " sel" : ""}"><span class="t1"><code>${esc(m.file || "(no file name)")}</code> from <span class="mono">${esc(m.url)}</span></span>` +
+         `<span class="t2">First seen ${esc(dateShort(m.first))} ${esc(hhmm(m.first))}, last ${esc(dateShort(m.last))} ${esc(hhmm(m.last))} UTC, from ${plural(m.ips || 0, "machine")}.${links}</span></li>`;
+  }
+  return h + "</ul>";
+}
+
+// ------------------------------------------------------------------ start
+drawTabs();
+initMap();
+pollInsights(); setInterval(pollInsights, INSIGHTS_MS);
+pollFeed().finally(() => { pollLive(); setInterval(pollLive, LIVE_MS); });
+setInterval(pollFeed, FEED_MS);
 </script>
 </body>
 </html>
