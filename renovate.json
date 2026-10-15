@@ -97,6 +97,13 @@
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(\\.(?<build>\\d+))?(-ls(?<revision>\\d+))?$"
     },
     {
+      "description": "Lidarr: ignore bogus tag 8.1.2135 (a mis-tagged 0.8.1.2135 build); without this Renovate proposes 'v8' and never 3.x. Majors still need dashboard approval.",
+      "matchPackageNames": [
+        "lscr.io/linuxserver/lidarr"
+      ],
+      "allowedVersions": "!/^8\\.1\\.2135$/"
+    },
+    {
       "description": "Immich server + ML must always run the SAME version: one PR/approval for both",
       "matchPackageNames": [
         "ghcr.io/immich-app/immich-server",
