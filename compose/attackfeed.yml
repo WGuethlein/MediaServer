@@ -38,7 +38,7 @@ services:
 
   attackfeed:
     container_name: attackfeed
-    image: nginxinc/nginx-unprivileged:1.29.1-alpine
+    image: nginxinc/nginx-unprivileged:1.31.7-alpine
     restart: unless-stopped
     read_only: true
     cap_drop: [ALL]
