@@ -12,7 +12,7 @@ services:
         PUID: ${PUID}
         PGID: ${PGID}
     image: gameclips:local
-    pull_policy: build
+    pull_policy: never     # never pulled; deploy.sh builds with `up --build` (policy "build" rebuilt on every `compose run`, leaving the running container on an untagged image that homelab-autoupdate would see as changed)
     restart: unless-stopped
     networks:
       - default
