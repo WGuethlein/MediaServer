@@ -1,7 +1,7 @@
 # GameClips — funny-moment clipper for the user's game recordings (2026-10-22).
 # The Windows helper uploads 5-min chunks to :8765 (LAN only); the GPU pipeline cuts masters to
-# /mnt/media/gameclips and uploads share copies to Immich. Source + docs: HomeAutomation repo,
-# gameclips/server and docs/gameclips.md. Image is built locally (deploy.sh), never pulled:
+# /mnt/media/gameclips and uploads share copies to Immich. Source + docs: github.com/WGuethlein/AutoClip
+# (server/, docs/operations.md). Image is built locally (deploy.sh), never pulled:
 # Renovate skips services with `build:`, homelab-autoupdate only touches services whose image changed in git.
 services:
   gameclips:
