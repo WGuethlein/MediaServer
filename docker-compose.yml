@@ -117,3 +117,4 @@ include:
   # --- OTHER ---
   - compose/mealie.yml
   - compose/minecraft.yml
+  - compose/gameclips.yml    # game-session funny-moment clipper, GPU (2026-10-22)

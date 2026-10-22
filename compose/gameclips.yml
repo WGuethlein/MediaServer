@@ -1,0 +1,58 @@
+# GameClips — funny-moment clipper for the user's game recordings (2026-10-22).
+# The Windows helper uploads 5-min chunks to :8765 (LAN only); the GPU pipeline cuts masters to
+# /mnt/media/gameclips and uploads share copies to Immich. Source + docs: HomeAutomation repo,
+# gameclips/server and docs/gameclips.md. Image is built locally (deploy.sh), never pulled:
+# Renovate skips services with `build:`, homelab-autoupdate only touches services whose image changed in git.
+services:
+  gameclips:
+    container_name: gameclips
+    build:
+      context: /home/docker_user/gameclips/server
+      args:
+        PUID: ${PUID}
+        PGID: ${PGID}
+    image: gameclips:local
+    pull_policy: build
+    restart: unless-stopped
+    networks:
+      - default
+      - immich          # reaches immich-server:2283 (network declared in immich.yml)
+    ports:
+      - "192.168.1.108:8765:8765"
+    environment:
+      TZ: ${TZ}
+      GC_TOKEN_FILE: /run/secrets/gameclips_upload_token
+      GC_IMMICH_URL: http://immich-server:2283
+      GC_IMMICH_KEY_FILE: /run/secrets/gameclips_immich_key
+      GC_ANTHROPIC_KEY_FILE: /run/secrets/gameclips_anthropic_key
+      GC_ALERT_URL_FILE: /run/alerts.url
+      # "off" until the Anthropic key works: the stored key is user-scoped (sk-ant-usr-) and the API
+      # rejects it without an anthropic-workspace-id header (2026-10-22). Set back to "claude" with a
+      # workspace-scoped key (sk-ant-api03-...). Off = no Claude calls; judge-band candidates use the score fallback.
+      GC_JUDGE: "off"
+    secrets:
+      - gameclips_upload_token
+      - gameclips_immich_key
+      - gameclips_anthropic_key
+    volumes:
+      - /mnt/data/gameclips:/data
+      - /mnt/media/gameclips:/masters
+      - /home/docker_user/.config/homelab/alerts.url:/run/alerts.url:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+secrets:
+  gameclips_upload_token:
+    file: ${DOCKERDIR}/secrets/gameclips_upload_token
+  gameclips_immich_key:
+    file: ${DOCKERDIR}/secrets/gameclips_immich_key
+  gameclips_anthropic_key:
+    file: ${DOCKERDIR}/secrets/gameclips_anthropic_key
