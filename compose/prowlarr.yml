@@ -1,7 +1,7 @@
 services:
   prowlarr:
     container_name: prowlarr
-    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls164
+    image: lscr.io/linuxserver/prowlarr:2.6.5.5623-ls165
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
