@@ -1,7 +1,7 @@
 services:
   plex:
     container_name: plex
-    image: plexinc/pms-docker:1.43.4.10903-e5521bd8c
+    image: plexinc/pms-docker:1.43.5.11029-6bf8af3f0
     restart: unless-stopped
     # Host networking — required for GDM/DLNA/Bonjour LAN discovery.
     # Plex is NOT on any docker network; not reachable by container DNS.
