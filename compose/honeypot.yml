@@ -11,7 +11,7 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    mem_limit: 256m
+    mem_limit: 512m   # 256m OOM-killed 2026-10-25 after ~8 days of bot traffic
     pids_limit: 128
     networks:
       honeypot:
