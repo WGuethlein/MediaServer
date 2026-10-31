@@ -2,7 +2,7 @@
 services:
   audiobookrequest:
     container_name: audiobookrequest
-    image: markbeep/audiobookrequest:1.10.8
+    image: markbeep/audiobookrequest:1.11.0
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
