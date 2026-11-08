@@ -27,10 +27,10 @@ services:
       GC_IMMICH_KEY_FILE: /run/secrets/gameclips_immich_key
       GC_ANTHROPIC_KEY_FILE: /run/secrets/gameclips_anthropic_key
       GC_ALERT_URL_FILE: /run/alerts.url
-      # "off" until the Anthropic key works: the stored key is user-scoped (sk-ant-usr-) and the API
-      # rejects it without an anthropic-workspace-id header (2026-10-22). Set back to "claude" with a
-      # workspace-scoped key (sk-ant-api03-...). Off = no Claude calls; judge-band candidates use the score fallback.
-      GC_JUDGE: "off"
+      # Claude Haiku judges borderline scores from the transcript; verdicts with confidence < 0.7
+      # get the vision check (four screen frames). Both use the key above; "off" = no Claude calls.
+      GC_JUDGE: "claude"
+      GC_VISION: "on"
     secrets:
       - gameclips_upload_token
       - gameclips_immich_key
