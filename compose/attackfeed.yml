@@ -14,7 +14,8 @@ services:
     user: "1001:1001"
     mem_limit: 512m          # one cycle peaks ~120 MiB on a full 7-day store (tests/memcheck.py)
     networks:
-      - default           # reaches Loki at 192.168.1.73:3100
+      default:           # reaches Loki at 192.168.1.73:3100
+        ipv4_address: 172.18.0.31   # pinned, see docker-compose.yml
     command: ["python3", "-u", "-m", "attackfeed"]
     working_dir: /app
     volumes:

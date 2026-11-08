@@ -15,8 +15,9 @@ services:
     pull_policy: never     # never pulled; deploy.sh builds with `up --build` (policy "build" rebuilt on every `compose run`, leaving the running container on an untagged image that homelab-autoupdate would see as changed)
     restart: unless-stopped
     networks:
-      - default
-      - immich          # reaches immich-server:2283 (network declared in immich.yml)
+      default:
+        ipv4_address: 172.18.0.32   # pinned, see docker-compose.yml
+      immich:          # reaches immich-server:2283 (network declared in immich.yml)
     ports:
       - "192.168.1.108:8765:8765"
     environment:

@@ -7,6 +7,9 @@
 # NETWORKS
 ########################################
 networks:
+  # Every service on default needs a fixed ipv4_address (free: .23 .24 .27-.29 .39-.59 .61+).
+  # An unpinned container can grab a pinned one's IP at boot (2026-11-08: gameclips took
+  # radarr's .12 after a power loss -> radarr exited, mediaserver-compose failed).
   default:
     name: udms_default
     driver: bridge

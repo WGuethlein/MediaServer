@@ -9,8 +9,9 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - default
-      - t3_proxy
+      default:
+        ipv4_address: 172.18.0.37   # pinned, see docker-compose.yml
+      t3_proxy:
     environment:
       TZ: ${TZ}
       LOG_LEVEL: info

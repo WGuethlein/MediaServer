@@ -13,7 +13,8 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - default        # reaches sonarr:8989 / radarr:7878 by name
+      default:        # reaches sonarr:8989 / radarr:7878 by name
+        ipv4_address: 172.18.0.35   # pinned, see docker-compose.yml
     environment:
       TZ: ${TZ}
       CRON_SCHEDULE: "15 4 * * *"

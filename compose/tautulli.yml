@@ -8,8 +8,9 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - default
-      - t3_proxy
+      default:
+        ipv4_address: 172.18.0.38   # pinned, see docker-compose.yml
+      t3_proxy:
     volumes:
       - ${DOCKERDIR}/appdata/tautulli:/config
     environment:

@@ -9,8 +9,9 @@ services:
     security_opt:
       - no-new-privileges:true
     networks:
-      - default          # egress to wyatt-mon
-      - socket_proxy     # container discovery + logs (GET only)
+      default:          # egress to wyatt-mon
+        ipv4_address: 172.18.0.30   # pinned, see docker-compose.yml
+      socket_proxy:     # container discovery + logs (GET only)
     command:
       - run
       - --server.http.listen-addr=0.0.0.0:12345   # not published; debug UI via `docker exec`

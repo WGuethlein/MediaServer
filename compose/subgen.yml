@@ -7,7 +7,8 @@ services:
     image: mccloud/subgen:2026.07.3
     restart: unless-stopped
     networks:
-      - default
+      default:
+        ipv4_address: 172.18.0.36   # pinned, see docker-compose.yml
     environment:
       TZ: ${TZ}
       TRANSCRIBE_DEVICE: cuda

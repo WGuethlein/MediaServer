@@ -10,6 +10,7 @@ services:
       - no-new-privileges:true
     networks:
       default:
+        ipv4_address: 172.18.0.33   # pinned, see docker-compose.yml
     ports:
       - ${GTNH_PORT}:25565/tcp
     volumes:
