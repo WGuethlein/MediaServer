@@ -23,7 +23,7 @@ services:
 
   beszel-agent:
     container_name: beszel-agent
-    image: henrygd/beszel-agent-nvidia:0.21.0   # full tag: nvidia-smi + smartctl
+    image: henrygd/beszel-agent-nvidia:0.21.1   # full tag: nvidia-smi + smartctl
     restart: unless-stopped
     network_mode: host
     depends_on: [beszel-socket-proxy]
