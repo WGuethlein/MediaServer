@@ -1,7 +1,7 @@
 services:
   gtnh:
     container_name: gtnh
-    image: itzg/minecraft-server:java25@sha256:d3415f085e10f522969d3a580247ff23b4ccd8d5b152ca08280fb13395dd15bc
+    image: itzg/minecraft-server:java25@sha256:e528e38848e1456d683a60c624ce2b1a5ae15d1b221d368108fa05853388285a
     restart: unless-stopped
     tty: true
     stdin_open: true
