@@ -1,0 +1,28 @@
+# iptv-org/epg — builds guide.xml from channels.xml on a cron; Dispatcharr pulls it. Added 2026-11-16.
+# Dispatcharr (same network) reads http://172.18.0.41:3000/guide.xml. No Traefik router (internal only).
+# Image is pinned by digest because upstream only publishes :master; Renovate bumps the digest.
+# channels.xml source of truth: HomeAutomation/configs/live-tv/channels.xml. The grab runs at startup and daily,
+# so restart the container after editing channels.xml.
+services:
+  iptv-epg:
+    container_name: iptv-epg
+    image: ghcr.io/iptv-org/epg:master@sha256:59484164d8effbf5a404a172ee070f35553168aa28ac416d14645b8a5fcd32a8
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: 172.18.0.41   # pinned, see docker-compose.yml
+    volumes:
+      - ${DOCKERDIR}/appdata/iptv-epg/channels.xml:/epg/public/channels.xml:ro
+    environment:
+      TZ: ${TZ}
+      CRON_SCHEDULE: "0 10 * * *"   # UTC = 05:00 ET
+      DAYS: "7"
+      RUN_AT_STARTUP: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

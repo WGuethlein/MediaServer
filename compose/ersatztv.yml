@@ -1,0 +1,37 @@
+# ErsatzTV — scheduled/linear channels from the local library (NVENC). Added 2026-11-16.
+# Plex is host-networked and reaches it directly at http://172.18.0.40:8409 (HDHomeRun/IPTV endpoints).
+services:
+  ersatztv:
+    container_name: ersatztv
+    image: ghcr.io/ersatztv/legacy:v26.12.0
+    restart: unless-stopped
+    runtime: nvidia
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: 172.18.0.40   # pinned, see docker-compose.yml
+      t3_proxy:
+    volumes:
+      - ${DOCKERDIR}/appdata/ersatztv:/config
+      - ${DATADIR_MEDIA}:/mnt/media:ro
+    tmpfs:
+      - /transcode
+    environment:
+      TZ: ${TZ}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8409/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.ersatztv-rtr.entrypoints=websecure
+      - traefik.http.routers.ersatztv-rtr.rule=Host(`ersatztv.${DOMAINNAME_1}`)
+      - traefik.http.routers.ersatztv-rtr.middlewares=chain-tinyauth-lan@file
+      - traefik.http.routers.ersatztv-rtr.service=ersatztv-svc
+      - traefik.http.services.ersatztv-svc.loadbalancer.server.port=8409

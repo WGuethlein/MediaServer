@@ -1,0 +1,38 @@
+# Dispatcharr — IPTV/M3U/EPG manager; Plex-facing HDHomeRun-emulating tuner. Added 2026-11-16.
+# Plex is host-networked and reaches it directly at http://172.18.0.39:9191. AIO image: bundles Postgres + Redis.
+# Create the admin user via the web UI on first run (first-time setup is allowed from private networks).
+services:
+  dispatcharr:
+    container_name: dispatcharr
+    image: ghcr.io/dispatcharr/dispatcharr:0.33.0
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      default:
+        ipv4_address: 172.18.0.39   # pinned, see docker-compose.yml
+      t3_proxy:
+    volumes:
+      - ${DOCKERDIR}/appdata/dispatcharr:/data
+    environment:
+      TZ: ${TZ}
+      DISPATCHARR_ENV: aio
+      REDIS_HOST: localhost
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      DISPATCHARR_LOG_LEVEL: info
+      # Traefik arrives from t3_proxy; trust its X-Forwarded-For/X-Real-IP only from there.
+      DISPATCHARR_TRUSTED_PROXIES: 192.168.90.0/24
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:9191/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=t3_proxy
+      - traefik.http.routers.dispatcharr-rtr.entrypoints=websecure
+      - traefik.http.routers.dispatcharr-rtr.rule=Host(`dispatcharr.${DOMAINNAME_1}`)
+      - traefik.http.routers.dispatcharr-rtr.middlewares=chain-tinyauth-lan@file
+      - traefik.http.routers.dispatcharr-rtr.service=dispatcharr-svc
+      - traefik.http.services.dispatcharr-svc.loadbalancer.server.port=9191

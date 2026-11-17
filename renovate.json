@@ -47,7 +47,8 @@
         "grafana/alloy",
         "python",
         "nginxinc/nginx-unprivileged",
-        "lscr.io/linuxserver/tautulli"
+        "lscr.io/linuxserver/tautulli",
+        "ghcr.io/iptv-org/epg"
       ],
       "matchUpdateTypes": [
         "minor",

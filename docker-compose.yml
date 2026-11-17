@@ -104,6 +104,11 @@ include:
   - compose/backrest.yml     # restic backup browser/restore, read-only (2026-10-11)
   - compose/immich.yml       # photos (2026-10-11)
 
+  # --- LIVE TV ---
+  - compose/dispatcharr.yml  # IPTV/M3U/EPG manager, Plex tuner source (2026-11-16)
+  - compose/ersatztv.yml     # scheduled channels from the library, NVENC (2026-11-16)
+  - compose/iptv-epg.yml     # iptv-org EPG grabber -> guide.xml for Dispatcharr (2026-11-16)
+
   # --- REQUESTS & DASHBOARDS ---
   - compose/seerr.yml
   - compose/audiobookrequest.yml
