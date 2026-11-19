@@ -1,7 +1,7 @@
 services:
   listenarr:
     container_name: listenarr
-    image: therobbiedavis/listenarr:canary@sha256:b497a721f5291b4ffeb38434836cf3f7c11629a6e8c4747f5dc1e54ecf717c30
+    image: therobbiedavis/listenarr:canary@sha256:7c4735718c6147bf05c8373e92483812d8b5b722f3c9aee086898b227bfff007
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
