@@ -1,6 +1,6 @@
 # Dispatcharr — IPTV/M3U/EPG manager; Plex-facing HDHomeRun-emulating tuner. Added 2026-11-16.
 # Plex is host-networked and reaches it directly at http://172.18.0.39:9191. AIO image: bundles Postgres + Redis.
-# Create the admin user via the web UI on first run (first-time setup is allowed from private networks).
+# Admin created with manage.py createsuperuser; password in secrets/dispatcharr_admin (see HomeAutomation docs/apps.md).
 services:
   dispatcharr:
     container_name: dispatcharr
