@@ -6,7 +6,7 @@
 services:
   iptv-epg:
     container_name: iptv-epg
-    image: ghcr.io/iptv-org/epg:master@sha256:4bfbd9a45bccf82ce7158c6b7dbe21ac6fdb1bfc124df7b20f3ff0ebe241a327
+    image: ghcr.io/iptv-org/epg:master@sha256:f03b79e0e6e27d94e5234bd38a33fe4fc53234b12c73ad8bfd304a6f1eef8492
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
