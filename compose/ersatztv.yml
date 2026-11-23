@@ -3,7 +3,7 @@
 services:
   ersatztv:
     container_name: ersatztv
-    image: ghcr.io/ersatztv/legacy:v26.12.0
+    image: ghcr.io/ersatztv/legacy:v26.13.0
     restart: unless-stopped
     runtime: nvidia
     security_opt:
