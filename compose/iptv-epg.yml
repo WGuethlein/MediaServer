@@ -19,6 +19,7 @@ services:
       TZ: ${TZ}
       CRON_SCHEDULE: "0 10 * * *"   # UTC = 05:00 ET
       DAYS: "7"
+      MAX_CONNECTIONS: "10"   # parallel site requests (default 1); grab ~18 min serial
       RUN_AT_STARTUP: "true"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
