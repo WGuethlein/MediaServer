@@ -36,3 +36,11 @@ services:
       - traefik.http.routers.dispatcharr-rtr.middlewares=chain-tinyauth-lan@file
       - traefik.http.routers.dispatcharr-rtr.service=dispatcharr-svc
       - traefik.http.services.dispatcharr-svc.loadbalancer.server.port=9191
+      # LAN-only, no-login router for IPTV clients (Kodi IPTV Simple, TiviMate…): M3U/XMLTV, streams, channel logos.
+      # Everything else (UI, API) stays on dispatcharr-rtr behind tinyauth. lan-only = RFC1918/CGNAT ipAllowList;
+      # Traefik sees real client IPs (443 is DNAT-forwarded, no Cloudflare proxy), so internet clients get 403. 2026-11-25
+      - traefik.http.routers.dispatcharr-iptv-rtr.entrypoints=websecure
+      - traefik.http.routers.dispatcharr-iptv-rtr.rule=Host(`dispatcharr.${DOMAINNAME_1}`) && (PathPrefix(`/output/`) || PathPrefix(`/proxy/`) || PathRegexp(`^/api/channels/logos/[0-9]+/cache/?$`))
+      - traefik.http.routers.dispatcharr-iptv-rtr.priority=100
+      - traefik.http.routers.dispatcharr-iptv-rtr.middlewares=chain-lan-only@file
+      - traefik.http.routers.dispatcharr-iptv-rtr.service=dispatcharr-svc
