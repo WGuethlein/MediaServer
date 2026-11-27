@@ -4,7 +4,7 @@
 services:
   subgen:
     container_name: subgen
-    image: mccloud/subgen:2026.07.3
+    image: mccloud/subgen:2026.11.2
     restart: unless-stopped
     networks:
       default:
